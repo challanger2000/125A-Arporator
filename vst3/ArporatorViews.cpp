@@ -414,8 +414,9 @@ VSTGUI::CMouseEventResult UIScaleView::onMouseDown(
 
 void configureEditor(VSTGUI::VST3Editor* editor,double width,double height,double zoom) {
     if (!editor) return;
+    editor->setAllowedZoomFactors(std::vector<double>{1.0,1.5});
+    editor->setEditorSizeConstrains({width,height},{width,height});
     editor->setZoomFactor(zoom>=1.25?1.5:1.0);
-    editor->setRect({0,0,width,height});
 }
 
 VSTGUI::CView* createCustomView(VSTGUI::UTF8StringPtr name,
