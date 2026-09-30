@@ -508,6 +508,40 @@ int main() {
     }
     CHECK(restartBaseVelocity);
 
+    // Per-step NOTE selects a relative position in the arp order rather than
+    // a chromatic semitone. This keeps CHORD ONLY / SCALE behaviour musical.
+    settings = Settings{};
+    settings.patternLength = 3;
+    settings.stepsPerQuarter = 4.0;
+    settings.mode = Mode::Up;
+    settings.restartOnTrigger = true;
+    settings.scalePolicy = ScalePolicy::ChordOnly;
+    for (auto& s : settings.steps) {
+        s.enabled = true;
+        s.velocity = 1.0f;
+        s.gate = 1.0f;
+        s.ratchet = 1;
+        s.probability = 1.0f;
+        s.noteOffset = 0;
+    }
+    settings.steps[0].noteOffset = 0;
+    settings.steps[1].noteOffset = 1;
+    settings.steps[2].noteOffset = -2;
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 13000,
+                   {
+                       {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 67, 1.0f}
+                   },
+                   out);
+    auto selectedNotes = noteOns(out);
+    CHECK(selectedNotes.size() >= 3);
+    CHECK(selectedNotes[0] == 60);
+    CHECK(selectedNotes[1] == 67);
+    CHECK(selectedNotes[2] == 60);
+
     std::cout << "ArporatorEngineTests PASS\n";
     return EXIT_SUCCESS;
 }
