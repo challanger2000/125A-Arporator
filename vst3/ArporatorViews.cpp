@@ -17,15 +17,17 @@
 namespace arporator::vst3::gui {
 namespace {
 
-constexpr VSTGUI::CColor kBg {7,10,14,255};
-constexpr VSTGUI::CColor kPanel {17,22,29,255};
-constexpr VSTGUI::CColor kPanel2 {10,14,19,255};
-constexpr VSTGUI::CColor kBorder {61,74,88,220};
-constexpr VSTGUI::CColor kText {239,243,247,255};
-constexpr VSTGUI::CColor kMuted {143,155,168,255};
-constexpr VSTGUI::CColor kAccent {86,154,220,255};
-constexpr VSTGUI::CColor kRed {215,25,32,255};
-constexpr VSTGUI::CColor kSilver {217,217,217,255};
+constexpr VSTGUI::CColor kBg {23,25,29,255};
+constexpr VSTGUI::CColor kPanel {31,34,39,255};
+constexpr VSTGUI::CColor kPanel2 {26,29,34,255};
+constexpr VSTGUI::CColor kBorder {57,62,70,190};
+constexpr VSTGUI::CColor kText {224,227,231,255};
+constexpr VSTGUI::CColor kMuted {137,143,151,255};
+constexpr VSTGUI::CColor kAccent {69,137,196,255};
+constexpr VSTGUI::CColor kPlayhead {91,177,231,255};
+constexpr VSTGUI::CColor kRed {192,58,61,255};
+constexpr VSTGUI::CColor kAmber {192,152,79,255};
+constexpr VSTGUI::CColor kSilver {205,208,211,255};
 constexpr double kPi = 3.14159265358979323846;
 
 bool ctrlReset(VSTGUI::CControl* control, const VSTGUI::CButtonState& buttons) {
@@ -107,7 +109,7 @@ void FaceplateView::draw(VSTGUI::CDrawContext* c) {
     box(22,88,1136,116);
     box(22,216,1136,434,true);
 
-    c->setFrameColor({86,154,220,70});
+    c->setFrameColor({69,137,196,38});
     c->setLineWidth(1.0);
     c->drawLine({r.left+34,r.top+210},{r.left+1146,r.top+210});
     c->drawLine({r.left+34,r.top+520},{r.left+1146,r.top+520});
@@ -162,14 +164,14 @@ void KnobView::draw(VSTGUI::CDrawContext* c) {
     const double angle=(135.0+n*270.0)*kPi/180.0;
 
     c->setDrawMode(VSTGUI::kAntiAliasing);
-    c->setFillColor({0,0,0,105});
-    c->drawEllipse({center.x-radius-5,center.y-radius-2,center.x+radius+5,center.y+radius+8},VSTGUI::kDrawFilled);
-    c->setFillColor({58,65,74,255});
-    c->setFrameColor({104,114,126,220});
-    c->drawEllipse({center.x-radius-3,center.y-radius-3,center.x+radius+3,center.y+radius+3},VSTGUI::kDrawFilledAndStroked);
+    c->setFillColor({18,20,24,125});
+    c->drawEllipse({center.x-radius-2,center.y-radius-1,center.x+radius+2,center.y+radius+3},VSTGUI::kDrawFilled);
+    c->setFillColor({46,50,57,255});
+    c->setFrameColor({72,78,87,210});
+    c->drawEllipse({center.x-radius-2,center.y-radius-2,center.x+radius+2,center.y+radius+2},VSTGUI::kDrawFilledAndStroked);
     const double cap=radius*0.72;
-    c->setFillColor({15,20,27,255});
-    c->setFrameColor({5,7,10,255});
+    c->setFillColor({27,30,35,255});
+    c->setFrameColor({18,20,24,255});
     c->drawEllipse({center.x-cap,center.y-cap,center.x+cap,center.y+cap},VSTGUI::kDrawFilledAndStroked);
     c->setFrameColor(kAccent);
     c->setLineWidth(2.0);
@@ -249,8 +251,8 @@ ToggleView::ToggleView(const ToggleView& o)
 void ToggleView::draw(VSTGUI::CDrawContext* c) {
     const auto r=getViewSize();
     const bool on=getValueNormalized()>=0.5f;
-    c->setFillColor(on?VSTGUI::CColor{39,89,128,255}:kPanel2);
-    c->setFrameColor(on?VSTGUI::CColor{113,186,239,255}:kBorder);
+    c->setFillColor(on?VSTGUI::CColor{41,71,96,255}:kPanel2);
+    c->setFrameColor(on?kAccent:kBorder);
     c->drawRect(r,VSTGUI::kDrawFilledAndStroked);
     c->setFont(VSTGUI::kNormalFontSmall);
     c->setFontColor(kText);
@@ -284,9 +286,9 @@ ActionButton::ActionButton(const ActionButton& o)
 
 void ActionButton::draw(VSTGUI::CDrawContext* c) {
     const auto r=getViewSize();
-    c->setFillColor({34,77,108,255});
-    c->setFrameColor({113,186,239,255});
-    c->setLineWidth(1.4);
+    c->setFillColor({41,66,86,255});
+    c->setFrameColor(kAccent);
+    c->setLineWidth(1.0);
     c->drawRect(r,VSTGUI::kDrawFilledAndStroked);
     c->setFont(VSTGUI::kNormalFont,9.0,VSTGUI::kBoldFace);
     c->setFontColor(kText);
@@ -343,10 +345,10 @@ void StepGridView::draw(VSTGUI::CDrawContext* c) {
         const int ratchet=1+static_cast<int>(std::lround(controller_->getParamNormalized(kStepRatchetBase+i)*3.0));
         const double probability=controller_->getParamNormalized(kStepProbabilityBase+i);
 
-        c->setFillColor(!inLength?VSTGUI::CColor{7,10,14,255}:
-                        enabled?VSTGUI::CColor{31,57,76,255}:VSTGUI::CColor{16,21,27,255});
-        c->setFrameColor(selected?VSTGUI::CColor{123,191,241,255}:
-                         locked?VSTGUI::CColor{215,25,32,210}:kBorder);
+        c->setFillColor(!inLength?VSTGUI::CColor{22,24,28,255}:
+                        enabled?VSTGUI::CColor{35,48,60,255}:VSTGUI::CColor{27,30,35,255});
+        c->setFrameColor(selected?kAccent:
+                         locked?kRed:kBorder);
         c->setLineWidth(selected?2.0:1.0);
         c->drawRect(cell,VSTGUI::kDrawFilledAndStroked);
 
@@ -393,7 +395,7 @@ void StepGridView::draw(VSTGUI::CDrawContext* c) {
         if (probability<0.999) {
             char pr[8]{};
             std::snprintf(pr,sizeof(pr),"%d%%",static_cast<int>(std::lround(probability*100.0)));
-            c->setFontColor({230,188,112,255});
+            c->setFontColor(kAmber);
             c->drawString(pr,{cell.left+4,cell.top+18,cell.right-4,cell.top+31},VSTGUI::kRightText);
         }
     }
