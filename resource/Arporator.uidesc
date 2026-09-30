@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <vstgui-ui-description version="1">
   <colors>
-    <color name="Background" rgba="#070A0EFF"/>
-    <color name="Text" rgba="#EFF3F7FF"/>
-    <color name="Muted" rgba="#8F9BA8FF"/>
-    <color name="Accent" rgba="#569ADCFF"/>
+    <color name="Background" rgba="#17191DFF"/>
+    <color name="Text" rgba="#E0E3E7FF"/>
+    <color name="Muted" rgba="#898F97FF"/>
+    <color name="Accent" rgba="#4589C4FF"/>
   </colors>
   <fonts>
     <font name="Title" font-name="Arial" size="25" bold="true" italic="false"/>
