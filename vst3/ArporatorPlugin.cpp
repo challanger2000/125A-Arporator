@@ -1076,6 +1076,8 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* state) {
         setNorm(kStepLockBase + i, step.locked ? 1.0 : 0.0);
     }
 
+    if (editor_ && editor_->getFrame())
+        editor_->getFrame()->invalid();
     return kResultOk;
 }
 
@@ -1085,9 +1087,11 @@ tresult PLUGIN_API Controller::setParamNormalized(
     ParamValue value) {
     const auto result = EditControllerEx1::setParamNormalized(tag, value);
     if (result == kResultOk &&
-        tag == kPlayheadId &&
         editor_ &&
         editor_->getFrame()) {
+        // StepGridView and SelectedStepView intentionally aggregate many
+        // parameters and are not individually bound VSTGUI controls. Redraw
+        // them for host automation, processor output (playhead) and recall.
         editor_->getFrame()->invalid();
     }
     return result;
