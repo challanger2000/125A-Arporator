@@ -11,7 +11,7 @@ static const Steinberg::FUID kControllerUID(
     0x125A4152, 0x504F5241, 0x544F5200, 0x00000002);
 
 constexpr Steinberg::int32 kStateMagic = 0x41525031; // ARP1
-constexpr Steinberg::int32 kStateVersion = 1;
+constexpr Steinberg::int32 kStateVersion = 2;
 
 constexpr Steinberg::Vst::ParamID kModeId = 1000;
 constexpr Steinberg::Vst::ParamID kRateId = 1001;
@@ -23,6 +23,9 @@ constexpr Steinberg::Vst::ParamID kTriggerModeId = 1006;
 constexpr Steinberg::Vst::ParamID kScalePolicyId = 1007;
 constexpr Steinberg::Vst::ParamID kKeyRootId = 1008;
 constexpr Steinberg::Vst::ParamID kScaleModeId = 1009;
+constexpr Steinberg::Vst::ParamID kHumanizeId = 1010;
+constexpr Steinberg::Vst::ParamID kGrooveId = 1011;
+constexpr Steinberg::Vst::ParamID kStrumId = 1012;
 
 constexpr Steinberg::Vst::ParamID kStepEnableBase = 2000;
 constexpr Steinberg::Vst::ParamID kStepVelocityBase = 2100;
