@@ -142,7 +142,7 @@ private:
     int constrainPitch(int pitch,
                        const std::array<int, kMidiNotes>& chord,
                        int chordCount) const noexcept;
-    bool stepPassesProbability(int step) noexcept;
+    bool probabilityPasses(float probability) noexcept;
     std::uint32_t nextRandom() noexcept;
 
     void emitStep(double stepSample,
