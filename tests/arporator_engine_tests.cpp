@@ -50,7 +50,7 @@ int main() {
 
     // Continue enough blocks to get C-E-G-C and wrap pattern length independently.
     std::vector<int> pitches = noteOns(out);
-    for (int i = 0; i < 12; ++i) {
+    for (int i = 0; i < 20; ++i) {
         engine.process(48000.0, 120.0, 1000, {}, out);
         auto p = noteOns(out);
         pitches.insert(pitches.end(), p.begin(), p.end());
