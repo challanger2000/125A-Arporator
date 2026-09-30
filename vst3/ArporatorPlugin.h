@@ -11,6 +11,7 @@
 #include "../source/arporator_engine.h"
 #include "../source/variation.h"
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <vector>
