@@ -113,17 +113,6 @@ private:
     bool dragged_ {false};
 };
 
-class SelectedStepView final : public VSTGUI::CView {
-public:
-    SelectedStepView(const VSTGUI::CRect& size, Controller* controller);
-    void draw(VSTGUI::CDrawContext* context) override;
-    VSTGUI::CMouseEventResult onMouseDown(
-        VSTGUI::CPoint& where,
-        const VSTGUI::CButtonState& buttons) override;
-private:
-    Controller* controller_ {nullptr};
-};
-
 class UIScaleView final : public VSTGUI::CView {
 public:
     UIScaleView(const VSTGUI::CRect& size,
