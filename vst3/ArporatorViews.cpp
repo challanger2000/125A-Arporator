@@ -221,7 +221,9 @@ VSTGUI::CMouseEventResult SelectorView::onMouseDown(
     if (!buttons.isLeftButton() || labels_.size()<2) return VSTGUI::kMouseEventNotHandled;
     const int count=static_cast<int>(labels_.size());
     int index=std::clamp(static_cast<int>(std::lround(getValueNormalized()*(count-1))),0,count-1);
-    index=(index+1)%count;
+    const auto r=getViewSize();
+    index += where.x < r.getCenter().x ? -1 : 1;
+    index=std::clamp(index,0,count-1);
     beginEdit();
     setValueNormalized(static_cast<float>(index)/static_cast<float>(count-1));
     valueChanged();
@@ -295,9 +297,7 @@ VSTGUI::CMouseEventResult ActionButton::onMouseDown(
     if (!getViewSize().pointInside(where) || !buttons.isLeftButton())
         return VSTGUI::kMouseEventNotHandled;
     beginEdit();
-    setValueNormalized(1.0f);
-    valueChanged();
-    setValueNormalized(0.0f);
+    setValueNormalized(getValueNormalized() >= 0.5f ? 0.0f : 1.0f);
     valueChanged();
     endEdit();
     invalid();
@@ -550,6 +550,15 @@ VSTGUI::CMouseEventResult SelectedStepView::onMouseDown(
 
     const bool reset = buttons.isControlSet();
 
+    const auto continuousValue = [](double x, double left, double width) {
+        double n = std::clamp((x - left) / width, 0.0, 1.0);
+        if (n >= 0.90)
+            return 1.0;
+        if (n <= 0.02)
+            return 0.0;
+        return n;
+    };
+
     auto edit = [&](Steinberg::Vst::ParamID base,double v) {
         controller_->editParameter(
             static_cast<Steinberg::Vst::ParamID>(base+step),
@@ -577,25 +586,26 @@ VSTGUI::CMouseEventResult SelectedStepView::onMouseDown(
         }
         case 2:
             edit(kStepVelocityBase, reset ? 1.0 :
-                 (where.x-zoneLeft)/widths[zone]);
+                 continuousValue(where.x, zoneLeft, widths[zone]));
             break;
         case 3:
             edit(kStepGateBase, reset ? 1.0 :
-                 (where.x-zoneLeft)/widths[zone]);
+                 continuousValue(where.x, zoneLeft, widths[zone]));
             break;
         case 4: {
             if (reset) {
                 edit(kStepRatchetBase,0.0);
             } else {
                 int index=std::clamp(static_cast<int>(std::lround(current(kStepRatchetBase)*3.0)),0,3);
-                index=(index+1)%4;
+                index += where.x < zoneLeft+widths[zone]*0.5 ? -1 : 1;
+                index=std::clamp(index,0,3);
                 edit(kStepRatchetBase,static_cast<double>(index)/3.0);
             }
             break;
         }
         case 5:
             edit(kStepProbabilityBase, reset ? 1.0 :
-                 (where.x-zoneLeft)/widths[zone]);
+                 continuousValue(where.x, zoneLeft, widths[zone]));
             break;
         case 6: {
             if (reset) {
