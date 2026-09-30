@@ -161,10 +161,7 @@ private:
     std::uint32_t nextRandom() noexcept;
 
     void emitStep(double stepSample,
-                  double stepDuration,
-                  double blockStart,
-                  int blockSize,
-                  std::vector<MidiOutput>& output) noexcept;
+                  double stepDuration) noexcept;
 };
 
 } // namespace arporator
