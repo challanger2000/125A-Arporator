@@ -34,13 +34,13 @@
     <view class="CTextLabel" origin="480,158" size="82,12" title="SWING" transparent="true" font-color="Text" font="Label" text-alignment="center"/>
 
     <view class="CView" custom-view-name="ArpKnob" control-tag="1010" origin="586,101" size="66,60"/>
-    <view class="CTextLabel" origin="576,158" size="86,12" title="HUMANIZE" transparent="true" font-color="Text" font="Small" text-alignment="center"/>
+    <view class="CTextLabel" origin="576,158" size="86,12" title="HUMANIZE" transparent="true" font-color="Text" font="Label" text-alignment="center"/>
     <view class="CView" custom-view-name="ArpKnob" control-tag="1011" origin="668,101" size="66,60"/>
-    <view class="CTextLabel" origin="660,158" size="82,12" title="GROOVE" transparent="true" font-color="Text" font="Small" text-alignment="center"/>
+    <view class="CTextLabel" origin="660,158" size="82,12" title="GROOVE" transparent="true" font-color="Text" font="Label" text-alignment="center"/>
     <view class="CView" custom-view-name="ArpKnob" control-tag="1012" origin="750,101" size="66,60"/>
-    <view class="CTextLabel" origin="742,158" size="82,12" title="STRUM" transparent="true" font-color="Text" font="Small" text-alignment="center"/>
+    <view class="CTextLabel" origin="742,158" size="82,12" title="STRUM" transparent="true" font-color="Text" font="Label" text-alignment="center"/>
     <view class="CView" custom-view-name="ArpKnob" control-tag="1021" origin="832,101" size="66,60"/>
-    <view class="CTextLabel" origin="824,158" size="82,12" title="EVOLVE" transparent="true" font-color="Text" font="Small" text-alignment="center"/>
+    <view class="CTextLabel" origin="824,158" size="82,12" title="EVOLVE" transparent="true" font-color="Text" font="Label" text-alignment="center"/>
 
     <view class="CTextLabel" origin="916,92" size="84,12" title="TRIGGER" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
     <view class="CView" custom-view-name="ArpTrigger" control-tag="1006" origin="910,105" size="96,25"/>
