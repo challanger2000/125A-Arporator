@@ -520,11 +520,9 @@ VSTGUI::CMouseEventResult StepGridView::onMouseDown(
     if (step<0)
         return VSTGUI::kMouseEventNotHandled;
 
-    const int length=1+static_cast<int>(std::lround(
-        controller_->getParamNormalized(kPatternLengthId)*31.0));
-    if (step>=length)
-        return VSTGUI::kMouseEventNotHandled;
-
+    // All 32 stored steps remain editable even when Pattern Length is shorter.
+    // Steps outside the active length stay visually dim and are ignored by
+    // playback until Pattern Length includes them again.
     controller_->setSelectedStep(step);
 
     if (buttons.isRightButton()) {
