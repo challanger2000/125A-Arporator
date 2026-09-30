@@ -24,6 +24,15 @@ enum class ScalePolicy : std::uint8_t {
     Chromatic
 };
 
+struct VariationLocks {
+    bool rhythm {false};
+    bool velocity {false};
+    bool gate {false};
+    bool ratchet {false};
+    bool probability {false};
+    bool octave {false};
+};
+
 struct Step {
     bool enabled {true};
     bool locked {false};        // Variate/Evolve may not modify this step
@@ -44,6 +53,8 @@ struct Settings {
     float humanize {0.0f};      // 0..1 deterministic timing + velocity variation
     float groove {0.0f};        // 0..1 fixed musical microtiming/accent template
     float strum {0.0f};         // 0..1 pitch-rank-dependent note spread
+    float evolve {0.0f};        // 0..1 subtle deterministic multi-cycle evolution
+    VariationLocks evolveLocks {};
     float globalGate {1.0f};    // 0.01..1 global multiplier
     bool restartOnTrigger {true};
     int keyRoot {0};            // 0=C ... 11=B
@@ -116,6 +127,7 @@ private:
     std::uint32_t orderCounter_ {0};
     std::uint32_t rng_ {0x125A0001u};
     int nextNoteId_ {1};
+    std::uint64_t patternCycle_ {0u};
 
     bool anyHeld() const noexcept;
     void clearHeld() noexcept;
