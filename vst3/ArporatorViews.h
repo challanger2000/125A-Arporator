@@ -94,8 +94,23 @@ public:
     VSTGUI::CMouseEventResult onMouseDown(
         VSTGUI::CPoint& where,
         const VSTGUI::CButtonState& buttons) override;
+    VSTGUI::CMouseEventResult onMouseMoved(
+        VSTGUI::CPoint& where,
+        const VSTGUI::CButtonState& buttons) override;
+    VSTGUI::CMouseEventResult onMouseUp(
+        VSTGUI::CPoint& where,
+        const VSTGUI::CButtonState& buttons) override;
 private:
+    int stepAt(const VSTGUI::CPoint& where) const noexcept;
+    void showStepMenu(int step, const VSTGUI::CPoint& where);
     Controller* controller_ {nullptr};
+    int dragStep_ {-1};
+    VSTGUI::CPoint dragStart_ {};
+    double dragStartVelocity_ {1.0};
+    double dragStartGate_ {1.0};
+    enum class DragAxis { None, Velocity, Gate };
+    DragAxis dragAxis_ {DragAxis::None};
+    bool dragged_ {false};
 };
 
 class SelectedStepView final : public VSTGUI::CView {
