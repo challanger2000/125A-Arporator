@@ -484,18 +484,15 @@ tresult PLUGIN_API Processor::process(ProcessData& data) {
             {MidiInput::Type::AllNotesOff, 0, 0, 0, 0.0f});
     }
 
-    if (!data.outputEvents) {
-        if (inputOverflow)
-            engine_.reset();
-        return kResultOk;
-    }
-
     engine_.process(
         sampleRate_,
         tempo,
         data.numSamples,
         inputBuffer_,
         outputBuffer_);
+
+    if (!data.outputEvents)
+        return kResultOk;
 
     for (const auto& event : outputBuffer_) {
         Event out {};
