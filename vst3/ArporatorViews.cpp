@@ -191,45 +191,49 @@ VSTGUI::CMouseEventResult KnobView::onMouseDown(
     return VSTGUI::CKnob::onMouseDown(where,buttons);
 }
 
-SelectorView::SelectorView(const VSTGUI::CRect& size,
-                           VSTGUI::IControlListener* listener,
-                           std::int32_t tag,
-                           std::vector<std::string> labels)
-: VSTGUI::CControl(size,listener,tag), labels_(std::move(labels)) {
+PopupSelectorView::PopupSelectorView(
+    const VSTGUI::CRect& size,
+    VSTGUI::IControlListener* listener,
+    std::int32_t tag,
+    const std::vector<std::string>& labels)
+: VSTGUI::COptionMenu(
+      size,
+      listener,
+      tag,
+      nullptr,
+      nullptr,
+      VSTGUI::COptionMenu::kPopupStyle) {
     setTransparency(true);
+    setBackColor(kPanel2);
+    setFrameColor(kBorder);
+    setFont(VSTGUI::kNormalFontSmall);
+    setFontColor(kText);
+    setTextInset({5.0, 0.0});
+    setHoriAlign(VSTGUI::kCenterText);
+
+    for (const auto& label : labels)
+        addEntry(label.c_str());
+
+    if (getNbEntries() > 0)
+        setCurrent(0);
 }
 
-SelectorView::SelectorView(const SelectorView& o)
-: VSTGUI::CControl(o), labels_(o.labels_) {}
+PopupSelectorView::PopupSelectorView(const PopupSelectorView& other)
+: VSTGUI::COptionMenu(other) {}
 
-void SelectorView::draw(VSTGUI::CDrawContext* c) {
-    const auto r=getViewSize();
-    panel(c,r,true);
-    const int count=std::max(1,static_cast<int>(labels_.size()));
-    const int index=std::clamp(static_cast<int>(std::lround(getValueNormalized()*(count-1))),0,count-1);
-    c->setFont(VSTGUI::kNormalFontSmall);
-    c->setFontColor(kText);
-    c->drawString(labels_[static_cast<std::size_t>(index)].c_str(),r,VSTGUI::kCenterText);
-    setDirty(false);
-}
+VSTGUI::CMouseEventResult PopupSelectorView::onMouseDown(
+    VSTGUI::CPoint& where,
+    const VSTGUI::CButtonState& buttons) {
+    if (!getViewSize().pointInside(where))
+        return VSTGUI::kMouseEventNotHandled;
 
-VSTGUI::CMouseEventResult SelectorView::onMouseDown(
-    VSTGUI::CPoint& where,const VSTGUI::CButtonState& buttons) {
-    if (!getViewSize().pointInside(where)) return VSTGUI::kMouseEventNotHandled;
-    if (ctrlReset(this,buttons))
+    if (ctrlReset(this, buttons))
         return VSTGUI::kMouseDownEventHandledButDontNeedMovedOrUpEvents;
-    if (!buttons.isLeftButton() || labels_.size()<2) return VSTGUI::kMouseEventNotHandled;
-    const int count=static_cast<int>(labels_.size());
-    int index=std::clamp(static_cast<int>(std::lround(getValueNormalized()*(count-1))),0,count-1);
-    const auto r=getViewSize();
-    index += where.x < r.getCenter().x ? -1 : 1;
-    index=std::clamp(index,0,count-1);
-    beginEdit();
-    setValueNormalized(static_cast<float>(index)/static_cast<float>(count-1));
-    valueChanged();
-    endEdit();
-    invalid();
-    return VSTGUI::kMouseDownEventHandledButDontNeedMovedOrUpEvents;
+
+    if (!buttons.isLeftButton())
+        return VSTGUI::kMouseEventNotHandled;
+
+    return VSTGUI::COptionMenu::onMouseDown(where, buttons);
 }
 
 ToggleView::ToggleView(const VSTGUI::CRect& size,
@@ -678,13 +682,13 @@ VSTGUI::CView* createCustomView(VSTGUI::UTF8StringPtr name,
     if(std::strcmp(name,"ArpSelectedStep")==0) return new SelectedStepView(rect,controller);
     if(std::strcmp(name,"ArpVariate")==0 && tag>=0) return new ActionButton(rect,controller,tag,"VARIATE");
 
-    if(std::strcmp(name,"ArpMode")==0) return new SelectorView(rect,editor,tag,{"UP","DOWN","UP-DOWN","DOWN-UP","PLAYED","RANDOM"});
-    if(std::strcmp(name,"ArpRate")==0) return new SelectorView(rect,editor,tag,{"1/4","1/8","1/16","1/32","1/64","1/8T","1/16T","1/32T","1/8D","1/16D","1/32D"});
-    if(std::strcmp(name,"ArpOctaves")==0) return new SelectorView(rect,editor,tag,{"1","2","3","4"});
-    if(std::strcmp(name,"ArpTrigger")==0) return new SelectorView(rect,editor,tag,{"RESTART","CONTINUE"});
-    if(std::strcmp(name,"ArpPolicy")==0) return new SelectorView(rect,editor,tag,{"CHORD","SCALE","CHROM"});
-    if(std::strcmp(name,"ArpKey")==0) return new SelectorView(rect,editor,tag,{"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"});
-    if(std::strcmp(name,"ArpScale")==0) return new SelectorView(
+    if(std::strcmp(name,"ArpMode")==0) return new PopupSelectorView(rect,editor,tag,{"UP","DOWN","UP-DOWN","DOWN-UP","PLAYED","RANDOM"});
+    if(std::strcmp(name,"ArpRate")==0) return new PopupSelectorView(rect,editor,tag,{"1/4","1/8","1/16","1/32","1/64","1/8T","1/16T","1/32T","1/8D","1/16D","1/32D"});
+    if(std::strcmp(name,"ArpOctaves")==0) return new PopupSelectorView(rect,editor,tag,{"1","2","3","4"});
+    if(std::strcmp(name,"ArpTrigger")==0) return new PopupSelectorView(rect,editor,tag,{"RESTART","CONTINUE"});
+    if(std::strcmp(name,"ArpPolicy")==0) return new PopupSelectorView(rect,editor,tag,{"CHORD","SCALE","CHROM"});
+    if(std::strcmp(name,"ArpKey")==0) return new PopupSelectorView(rect,editor,tag,{"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"});
+    if(std::strcmp(name,"ArpScale")==0) return new PopupSelectorView(
         rect,editor,tag,
         {"MAJOR","MINOR","DORIAN","PHRYGIAN","LYDIAN",
          "MIXOLYD","HARM MIN","MAJ PENT","MIN PENT","BLUES"});
