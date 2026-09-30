@@ -1,0 +1,28 @@
+name: Arporator Core CI
+
+on:
+  push:
+    branches:
+      - v0.1.0-development
+    paths:
+      - "CMakeLists.txt"
+      - "source/**"
+      - "tests/**"
+      - ".github/workflows/core-ci.yml"
+  workflow_dispatch:
+
+jobs:
+  core:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build
+        run: cmake --build build --config Release --parallel
+
+      - name: Test
+        run: ctest --test-dir build -C Release --output-on-failure
