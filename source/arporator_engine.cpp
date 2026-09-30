@@ -472,9 +472,20 @@ void Engine::process(double sampleRate,
 
         if (sawAllNotesOff) {
             stopAll(eventSample, blockStart, numSamples, output);
-            running_ = false;
             currentStep_ = 0;
             directionIndex_ = 0;
+            directionSign_ = 1;
+
+            // Preserve event ordering semantics inside one timestamp:
+            // AllNotesOff followed by a fresh NoteOn at the same sample
+            // must be allowed to start a new phrase immediately.
+            if (sawNoteOn && anyHeld()) {
+                running_ = true;
+                nextStepSample_ = eventSample;
+                emitUntil(std::min(blockEnd, eventSample + 1.0));
+            } else {
+                running_ = false;
+            }
         } else if (!anyHeld()) {
             stopAll(eventSample, blockStart, numSamples, output);
             running_ = false;
