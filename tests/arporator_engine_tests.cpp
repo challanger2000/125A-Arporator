@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <iostream>
 #include <vector>
+#include <unordered_set>
 
 using namespace arporator;
 
@@ -791,6 +792,68 @@ int main() {
     engine.reset();
     CHECK(engine.lastEmittedStep() == -1);
     CHECK(!engine.running());
+
+    // Realtime output-capacity torture: repeated retriggers, extreme host tempo
+    // and 4x ratchet must never grow the pre-reserved plugin-style output
+    // vector. Every emitted NoteOn must still receive a NoteOff by the final
+    // AllNotesOff event.
+    settings = Settings{};
+    settings.patternLength = 1;
+    settings.stepsPerQuarter = 32.0;
+    settings.restartOnTrigger = true;
+    settings.globalGate = 1.0f;
+    settings.steps[0].enabled = true;
+    settings.steps[0].velocity = 1.0f;
+    settings.steps[0].gate = 1.0f;
+    settings.steps[0].ratchet = 4;
+    settings.steps[0].probability = 1.0f;
+    engine.setSettings(settings);
+    engine.reset();
+
+    std::vector<MidiInput> tortureInput;
+    for (int offset = 0, n = 0; offset < 32767; offset += 4096, ++n) {
+        tortureInput.push_back({
+            MidiInput::Type::NoteOn,
+            offset,
+            0,
+            48 + (n % 12),
+            1.0f
+        });
+    }
+    tortureInput.push_back({
+        MidiInput::Type::AllNotesOff,
+        32767,
+        0,
+        0,
+        0.0f
+    });
+
+    std::vector<MidiOutput> boundedOutput;
+    boundedOutput.reserve(8192);
+    const auto initialCapacity = boundedOutput.capacity();
+    engine.process(
+        22050.0,
+        5000.0,
+        32768,
+        tortureInput,
+        boundedOutput);
+
+    CHECK(boundedOutput.capacity() == initialCapacity);
+    CHECK(boundedOutput.size() <= initialCapacity);
+    CHECK(boundedOutput.size() > 1000);
+    CHECK(!engine.running());
+
+    std::unordered_set<int> tortureOns;
+    std::unordered_set<int> tortureOffs;
+    for (const auto& event : boundedOutput) {
+        if (event.type == MidiInput::Type::NoteOn)
+            tortureOns.insert(event.noteId);
+        else if (event.type == MidiInput::Type::NoteOff)
+            tortureOffs.insert(event.noteId);
+    }
+    CHECK(!tortureOns.empty());
+    for (const int noteId : tortureOns)
+        CHECK(tortureOffs.count(noteId) == 1u);
 
     std::cout << "ArporatorEngineTests PASS\n";
     return EXIT_SUCCESS;
