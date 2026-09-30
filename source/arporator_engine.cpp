@@ -372,11 +372,46 @@ void Engine::process(double sampleRate,
     const double stepDuration =
         samplesPerQuarter / std::max(0.125, settings_.stepsPerQuarter);
 
-    stopExpired(blockStart, blockEnd, numSamples, output);
+    std::vector<MidiInput> events = input;
+    std::stable_sort(events.begin(), events.end(),
+                     [numSamples](const MidiInput& a, const MidiInput& b) {
+                         const int ao = clampInt(a.sampleOffset, 0, numSamples - 1);
+                         const int bo = clampInt(b.sampleOffset, 0, numSamples - 1);
+                         return ao < bo;
+                     });
 
-    for (const auto& event : input) {
+    auto emitUntil = [&](double limitSample) {
+        stopExpired(blockStart, limitSample, numSamples, output);
+
+        if (!running_ || !anyHeld())
+            return;
+
+        int safety = 0;
+        while (nextStepSample_ < limitSample && safety++ < 512) {
+            double scheduled = nextStepSample_;
+            if ((currentStep_ & 1) != 0) {
+                const double maxDelay = stepDuration * 0.49;
+                scheduled += maxDelay * static_cast<double>(settings_.swing);
+            }
+
+            if (scheduled >= blockStart && scheduled < limitSample)
+                emitStep(scheduled, stepDuration, blockStart, numSamples, output);
+
+            currentStep_ = (currentStep_ + 1) % settings_.patternLength;
+            ++directionIndex_;
+            nextStepSample_ += stepDuration;
+        }
+
+        stopExpired(blockStart, limitSample, numSamples, output);
+    };
+
+    for (const auto& event : events) {
         const int offset = clampInt(event.sampleOffset, 0, numSamples - 1);
         const double eventSample = blockStart + static_cast<double>(offset);
+
+        // First render everything that is due strictly before this input event.
+        emitUntil(eventSample);
+
         const int channel = clampInt(event.channel, 0, 15);
         const int pitch = clampInt(event.pitch, 0, 127);
 
@@ -410,6 +445,10 @@ void Engine::process(double sampleRate,
                 running_ = true;
                 nextStepSample_ = eventSample;
             }
+
+            // A trigger starts immediately at its exact sample. Rendering to
+            // eventSample + 1 sample includes that first step but no later one.
+            emitUntil(std::min(blockEnd, eventSample + 1.0));
         } else if (event.type == MidiInput::Type::NoteOff ||
                    (event.type == MidiInput::Type::NoteOn && event.velocity <= 0.0f)) {
             auto& note = held_[static_cast<std::size_t>(channel)]
@@ -426,25 +465,7 @@ void Engine::process(double sampleRate,
         }
     }
 
-    if (running_ && anyHeld()) {
-        int safety = 0;
-        while (nextStepSample_ < blockEnd && safety++ < 512) {
-            double scheduled = nextStepSample_;
-            if ((currentStep_ & 1) != 0) {
-                const double maxDelay = stepDuration * 0.49;
-                scheduled += maxDelay * static_cast<double>(settings_.swing);
-            }
-
-            if (scheduled >= blockStart && scheduled < blockEnd)
-                emitStep(scheduled, stepDuration, blockStart, numSamples, output);
-
-            currentStep_ = (currentStep_ + 1) % settings_.patternLength;
-            ++directionIndex_;
-            nextStepSample_ += stepDuration;
-        }
-    }
-
-    stopExpired(blockStart, blockEnd, numSamples, output);
+    emitUntil(blockEnd);
 
     std::stable_sort(output.begin(), output.end(),
                      [](const MidiOutput& a, const MidiOutput& b) {
