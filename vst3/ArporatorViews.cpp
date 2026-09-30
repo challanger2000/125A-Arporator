@@ -386,10 +386,14 @@ void StepGridView::draw(VSTGUI::CDrawContext* c) {
             {cell.left+13,cell.bottom-7,cell.left+13+gateW,cell.bottom-4},
             VSTGUI::kDrawFilled);
 
-        if (ratchet>1) {
+        {
+            // Ratchet is always visible so every step can be edited directly,
+            // including the neutral 1x state (R1).
             char rt[8]{};
             std::snprintf(rt,sizeof(rt),"R%d",ratchet);
-            c->setFontColor({185,213,235,255});
+            c->setFontColor(ratchet>1
+                ? VSTGUI::CColor{185,213,235,255}
+                : VSTGUI::CColor{137,143,151,210});
             c->drawString(rt,{cell.left+4,cell.top+18,cell.right-4,cell.top+31},VSTGUI::kLeftText);
         }
         if (probability<0.999) {
@@ -508,7 +512,7 @@ void StepGridView::showStepMenu(int step, const VSTGUI::CPoint& where) {
 
         invalid();
     });
-    menu->forget();
+    // Keep the option menu alive for the asynchronous popup session.
 }
 
 void StepGridView::showRatchetMenu(int step, const VSTGUI::CPoint& where) {
@@ -542,7 +546,7 @@ void StepGridView::showRatchetMenu(int step, const VSTGUI::CPoint& where) {
             invalid();
         }
     });
-    menu->forget();
+    // Keep the option menu alive for the asynchronous popup session.
 }
 
 void StepGridView::showProbabilityMenu(int step, const VSTGUI::CPoint& where) {
@@ -578,7 +582,7 @@ void StepGridView::showProbabilityMenu(int step, const VSTGUI::CPoint& where) {
             invalid();
         }
     });
-    menu->forget();
+    // Keep the option menu alive for the asynchronous popup session.
 }
 
 VSTGUI::CMouseEventResult StepGridView::onMouseDown(
@@ -680,7 +684,7 @@ VSTGUI::CMouseEventResult StepGridView::onMouseUp(
         // deliberately match the marker row so normal step ON/OFF clicks remain
         // unchanged everywhere else.
         if (localY>=16.0 && localY<=34.0 &&
-            localX<cellW*0.50 && ratchet>1) {
+            localX<cellW*0.50) {
             showRatchetMenu(dragStep_,where);
         } else if (localY>=16.0 && localY<=34.0 &&
                    localX>=cellW*0.50 && probability<0.999) {
