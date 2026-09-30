@@ -1132,6 +1132,8 @@ void Controller::editParameter(ParamID id, double normalized) {
     beginEdit(id);
     performEdit(id, normalized);
     endEdit(id);
+    if (editor_ && editor_->getFrame())
+        editor_->getFrame()->invalid();
 }
 
 } // namespace arporator::vst3
