@@ -219,6 +219,63 @@ int main() {
     CHECK(upDown[0] == 60 && upDown[1] == 64 && upDown[2] == 67 &&
           upDown[3] == 64 && upDown[4] == 60);
 
+    // A MIDI event before a delayed swing step must not make that step vanish.
+    settings = Settings{};
+    settings.patternLength = 8;
+    settings.stepsPerQuarter = 4.0;
+    settings.mode = Mode::Up;
+    settings.restartOnTrigger = false;
+    settings.swing = 0.5f;
+    settings.scalePolicy = ScalePolicy::ChordOnly;
+    for (auto& s : settings.steps) {
+        s.enabled = true;
+        s.velocity = 1.0f;
+        s.gate = 0.5f;
+        s.ratchet = 1;
+        s.probability = 1.0f;
+    }
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 8000,
+                   {
+                       {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                       {MidiInput::Type::NoteOn, 7000, 0, 64, 1.0f}
+                   },
+                   out);
+    bool sawSwingStep = false;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn &&
+            e.sampleOffset == 7470 && e.pitch == 64) {
+            sawSwingStep = true;
+        }
+    }
+    CHECK(sawSwingStep);
+
+    // Random mode is deterministic after reset with the same explicit seed.
+    settings.swing = 0.0f;
+    settings.mode = Mode::Random;
+    settings.randomSeed = 0x125A1234u;
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 25000,
+                   {
+                       {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 67, 1.0f}
+                   },
+                   out);
+    const auto randomA = noteOns(out);
+    engine.reset();
+    engine.process(48000.0, 120.0, 25000,
+                   {
+                       {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 67, 1.0f}
+                   },
+                   out);
+    const auto randomB = noteOns(out);
+    CHECK(randomA == randomB);
+
     std::cout << "ArporatorEngineTests PASS\n";
     return EXIT_SUCCESS;
 }
