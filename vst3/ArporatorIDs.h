@@ -36,6 +36,7 @@ constexpr Steinberg::Vst::ParamID kLockOctaveId = 1019;
 constexpr Steinberg::Vst::ParamID kVariateTriggerId = 1020;
 constexpr Steinberg::Vst::ParamID kEvolveId = 1021;
 constexpr Steinberg::Vst::ParamID kLockNoteId = 1022;
+constexpr Steinberg::Vst::ParamID kPlayheadId = 1023;
 
 constexpr Steinberg::Vst::ParamID kStepEnableBase = 2000;
 constexpr Steinberg::Vst::ParamID kStepVelocityBase = 2100;
