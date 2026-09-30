@@ -1,0 +1,88 @@
+#pragma once
+
+#include "public.sdk/source/vst/vstaudioeffect.h"
+#include "public.sdk/source/vst/vsteditcontroller.h"
+#include "pluginterfaces/base/ibstream.h"
+#include "pluginterfaces/vst/ivstevents.h"
+
+#include "AtomicSnapshot.h"
+#include "../source/arporator_engine.h"
+
+#include <atomic>
+#include <cstdint>
+#include <vector>
+
+namespace arporator::vst3 {
+
+struct RuntimeState {
+    Settings settings {};
+    Steinberg::int32 rateIndex {2};   // 1/16
+    Steinberg::int32 scaleMode {0};   // Major
+};
+
+class Processor final : public Steinberg::Vst::AudioEffect {
+public:
+    Processor();
+
+    static Steinberg::FUnknown* createInstance(void*) {
+        return static_cast<Steinberg::Vst::IAudioProcessor*>(new Processor());
+    }
+
+    Steinberg::tresult PLUGIN_API initialize(Steinberg::FUnknown* context) override;
+    Steinberg::tresult PLUGIN_API setupProcessing(
+        Steinberg::Vst::ProcessSetup& setup) override;
+    Steinberg::uint32 PLUGIN_API getProcessContextRequirements() override;
+    Steinberg::tresult PLUGIN_API setActive(Steinberg::TBool state) override;
+    Steinberg::tresult PLUGIN_API setProcessing(Steinberg::TBool state) override;
+    Steinberg::tresult PLUGIN_API process(
+        Steinberg::Vst::ProcessData& data) override;
+    Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream* state) override;
+    Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream* state) override;
+
+private:
+    void readParameterChanges(
+        Steinberg::Vst::IParameterChanges* changes) noexcept;
+    void applyNormalizedParameter(
+        Steinberg::Vst::ParamID id,
+        double value) noexcept;
+    void applyRuntimeState(const RuntimeState& state) noexcept;
+    void consumePendingState() noexcept;
+    void publishState() noexcept;
+
+    bool readState(Steinberg::IBStream* stream, RuntimeState& state) const noexcept;
+    bool writeState(Steinberg::IBStream* stream, const RuntimeState& state) const noexcept;
+
+    static double stepsPerQuarterForRate(int index) noexcept;
+    static std::uint16_t scaleMaskForMode(int index) noexcept;
+
+    RuntimeState state_ {};
+    Engine engine_ {};
+
+    AtomicSnapshot<RuntimeState> pendingState_ {};
+    AtomicSnapshot<RuntimeState> publishedState_ {};
+    std::atomic<std::uint64_t> appliedPendingSequence_ {0u};
+
+    std::vector<MidiInput> inputBuffer_ {};
+    std::vector<MidiOutput> outputBuffer_ {};
+
+    double sampleRate_ {48000.0};
+    bool settingsDirty_ {true};
+    bool hadTransportState_ {false};
+    bool wasPlaying_ {false};
+};
+
+class Controller final : public Steinberg::Vst::EditControllerEx1 {
+public:
+    static Steinberg::FUnknown* createInstance(void*) {
+        return static_cast<Steinberg::Vst::IEditController*>(new Controller());
+    }
+
+    Steinberg::tresult PLUGIN_API initialize(Steinberg::FUnknown* context) override;
+    Steinberg::tresult PLUGIN_API setComponentState(
+        Steinberg::IBStream* state) override;
+
+private:
+    static std::uint16_t scaleMaskForMode(int index) noexcept;
+};
+
+} // namespace arporator::vst3
