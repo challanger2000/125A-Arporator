@@ -7,6 +7,8 @@ on:
     paths:
       - "CMakeLists.txt"
       - "vst3/**"
+      - "source/arporator_engine.cpp"
+      - "source/arporator_engine.h"
       - ".github/workflows/vst3-ci.yml"
   workflow_dispatch:
 
