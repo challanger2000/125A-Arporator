@@ -386,20 +386,27 @@ void StepGridView::draw(VSTGUI::CDrawContext* c) {
             {cell.left+13,cell.bottom-7,cell.left+13+gateW,cell.bottom-4},
             VSTGUI::kDrawFilled);
 
-        // Neutral secondary values stay visually silent. Their click zones
-        // remain active, so R1/P100 can still be changed without right-click.
-        if (ratchet > 1) {
-            char rt[8]{};
+        // R and P are permanent orientation labels. Only non-neutral values
+        // add a numeric suffix, so RESET returns to a clean "R" / "P" display.
+        char rt[8]{};
+        if (ratchet > 1)
             std::snprintf(rt,sizeof(rt),"R%d",ratchet);
-            c->setFontColor({185,213,235,255});
-            c->drawString(rt,{cell.left+4,cell.top+17,cell.right-4,cell.top+29},VSTGUI::kCenterText);
-        }
-        if (probability < 0.999) {
-            char pr[8]{};
+        else
+            std::snprintf(rt,sizeof(rt),"R");
+        c->setFontColor(ratchet > 1
+            ? VSTGUI::CColor{185,213,235,255}
+            : VSTGUI::CColor{137,143,151,210});
+        c->drawString(rt,{cell.left+4,cell.top+17,cell.right-4,cell.top+29},VSTGUI::kCenterText);
+
+        char pr[8]{};
+        if (probability < 0.999)
             std::snprintf(pr,sizeof(pr),"P%d",static_cast<int>(std::lround(probability*100.0)));
-            c->setFontColor(kAmber);
-            c->drawString(pr,{cell.left+4,cell.top+30,cell.right-4,cell.top+42},VSTGUI::kCenterText);
-        }
+        else
+            std::snprintf(pr,sizeof(pr),"P");
+        c->setFontColor(probability < 0.999
+            ? kAmber
+            : VSTGUI::CColor{137,143,151,210});
+        c->drawString(pr,{cell.left+4,cell.top+30,cell.right-4,cell.top+42},VSTGUI::kCenterText);
     }
     setDirty(false);
 }
