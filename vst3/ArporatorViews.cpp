@@ -389,6 +389,214 @@ VSTGUI::CMouseEventResult StepGridView::onMouseDown(
     return VSTGUI::kMouseDownEventHandledButDontNeedMovedOrUpEvents;
 }
 
+
+SelectedStepView::SelectedStepView(const VSTGUI::CRect& size, Controller* controller)
+: VSTGUI::CView(size), controller_(controller) {
+    setTransparency(true);
+    setMouseEnabled(true);
+}
+
+void SelectedStepView::draw(VSTGUI::CDrawContext* c) {
+    if (!controller_) { setDirty(false); return; }
+
+    const auto r = getViewSize();
+    const int step = controller_->selectedStep();
+    const auto value = [&](Steinberg::Vst::ParamID base) {
+        return std::clamp(
+            controller_->getParamNormalized(
+                static_cast<Steinberg::Vst::ParamID>(base + step)),
+            0.0, 1.0);
+    };
+
+    const double on = value(kStepEnableBase);
+    const double note = value(kStepNoteBase);
+    const double velocity = value(kStepVelocityBase);
+    const double gate = value(kStepGateBase);
+    const double ratchet = value(kStepRatchetBase);
+    const double probability = value(kStepProbabilityBase);
+    const double octave = value(kStepOctaveBase);
+    const double lock = value(kStepLockBase);
+
+    const int noteValue = static_cast<int>(std::lround(note * 8.0)) - 4;
+    const int ratchetValue = 1 + static_cast<int>(std::lround(ratchet * 3.0));
+    const int octaveValue = static_cast<int>(std::lround(octave * 4.0)) - 2;
+
+    const double gap = 8.0;
+    const double widths[8] = {64,82,104,104,82,112,82,72};
+    double x = r.left;
+
+    const auto drawCell = [&](double w,
+                              const char* label,
+                              const std::string& display,
+                              double level,
+                              bool active,
+                              bool levelBar) {
+        VSTGUI::CRect cell{x,r.top,x+w,r.bottom};
+        c->setFillColor(active ? VSTGUI::CColor{27,49,66,255} : kPanel2);
+        c->setFrameColor(active ? VSTGUI::CColor{105,175,228,230} : kBorder);
+        c->setLineWidth(active ? 1.5 : 1.0);
+        c->drawRect(cell,VSTGUI::kDrawFilledAndStroked);
+
+        c->setFont(VSTGUI::kNormalFontSmall);
+        c->setFontColor(kMuted);
+        c->drawString(label,
+                      {cell.left+3,cell.top+4,cell.right-3,cell.top+18},
+                      VSTGUI::kCenterText);
+
+        c->setFont(VSTGUI::kNormalFont,10.0,VSTGUI::kBoldFace);
+        c->setFontColor(kText);
+        c->drawString(display.c_str(),
+                      {cell.left+3,cell.top+23,cell.right-3,cell.top+46},
+                      VSTGUI::kCenterText);
+
+        if (levelBar) {
+            const double normalized = std::clamp(level,0.0,1.0);
+            const double bw = (w-12.0)*normalized;
+            c->setFillColor({9,13,18,255});
+            c->drawRect({cell.left+6,cell.bottom-16,cell.right-6,cell.bottom-9},
+                        VSTGUI::kDrawFilled);
+            c->setFillColor(kAccent);
+            c->drawRect({cell.left+6,cell.bottom-16,cell.left+6+bw,cell.bottom-9},
+                        VSTGUI::kDrawFilled);
+        }
+        x += w + gap;
+    };
+
+    char stepLabel[16]{};
+    std::snprintf(stepLabel,sizeof(stepLabel),"STEP %02d",step+1);
+    c->setFont(VSTGUI::kNormalFont,10.0,VSTGUI::kBoldFace);
+    c->setFontColor(kAccent);
+    c->drawString(stepLabel,
+                  {r.left,r.top-23,r.left+120,r.top-5},
+                  VSTGUI::kLeftText);
+
+    drawCell(widths[0],"ON",on>=0.5 ? "ON" : "OFF",on,on>=0.5,false);
+
+    char noteText[16]{};
+    std::snprintf(noteText,sizeof(noteText),"%+d",noteValue);
+    drawCell(widths[1],"NOTE",noteText,note,true,false);
+
+    char velocityText[16]{};
+    std::snprintf(velocityText,sizeof(velocityText),"%d%%",
+                  static_cast<int>(std::lround(velocity*100.0)));
+    drawCell(widths[2],"VELOCITY",velocityText,velocity,true,true);
+
+    char gateText[16]{};
+    std::snprintf(gateText,sizeof(gateText),"%d%%",
+                  static_cast<int>(std::lround((0.01+gate*0.99)*100.0)));
+    drawCell(widths[3],"GATE",gateText,gate,true,true);
+
+    char ratchetText[16]{};
+    std::snprintf(ratchetText,sizeof(ratchetText),"%dx",ratchetValue);
+    drawCell(widths[4],"RATCHET",ratchetText,ratchet,true,false);
+
+    char probabilityText[16]{};
+    std::snprintf(probabilityText,sizeof(probabilityText),"%d%%",
+                  static_cast<int>(std::lround(probability*100.0)));
+    drawCell(widths[5],"PROBABILITY",probabilityText,probability,true,true);
+
+    char octaveText[16]{};
+    std::snprintf(octaveText,sizeof(octaveText),"%+d",octaveValue);
+    drawCell(widths[6],"OCTAVE",octaveText,octave,true,false);
+
+    drawCell(widths[7],"LOCK",lock>=0.5 ? "LOCK" : "OPEN",lock,lock>=0.5,false);
+
+    setDirty(false);
+}
+
+VSTGUI::CMouseEventResult SelectedStepView::onMouseDown(
+    VSTGUI::CPoint& where,
+    const VSTGUI::CButtonState& buttons) {
+    if (!controller_ || !buttons.isLeftButton() ||
+        !getViewSize().pointInside(where))
+        return VSTGUI::kMouseEventNotHandled;
+
+    const auto r = getViewSize();
+    const int step = controller_->selectedStep();
+    const double gap = 8.0;
+    const double widths[8] = {64,82,104,104,82,112,82,72};
+
+    int zone = -1;
+    double zoneLeft = r.left;
+    for (int i=0;i<8;++i) {
+        if (where.x >= zoneLeft && where.x <= zoneLeft+widths[i]) {
+            zone=i;
+            break;
+        }
+        zoneLeft += widths[i]+gap;
+    }
+    if (zone < 0)
+        return VSTGUI::kMouseEventNotHandled;
+
+    const bool reset = buttons.isControlSet();
+
+    auto edit = [&](Steinberg::Vst::ParamID base,double v) {
+        controller_->editParameter(
+            static_cast<Steinberg::Vst::ParamID>(base+step),
+            std::clamp(v,0.0,1.0));
+    };
+    auto current = [&](Steinberg::Vst::ParamID base) {
+        return controller_->getParamNormalized(
+            static_cast<Steinberg::Vst::ParamID>(base+step));
+    };
+
+    switch(zone) {
+        case 0:
+            edit(kStepEnableBase, reset ? 1.0 : (current(kStepEnableBase)>=0.5?0.0:1.0));
+            break;
+        case 1: {
+            if (reset) {
+                edit(kStepNoteBase,0.5);
+            } else {
+                int index=std::clamp(static_cast<int>(std::lround(current(kStepNoteBase)*8.0)),0,8);
+                index += where.x < zoneLeft+widths[zone]*0.5 ? -1 : 1;
+                index=std::clamp(index,0,8);
+                edit(kStepNoteBase,static_cast<double>(index)/8.0);
+            }
+            break;
+        }
+        case 2:
+            edit(kStepVelocityBase, reset ? 1.0 :
+                 (where.x-zoneLeft)/widths[zone]);
+            break;
+        case 3:
+            edit(kStepGateBase, reset ? 1.0 :
+                 (where.x-zoneLeft)/widths[zone]);
+            break;
+        case 4: {
+            if (reset) {
+                edit(kStepRatchetBase,0.0);
+            } else {
+                int index=std::clamp(static_cast<int>(std::lround(current(kStepRatchetBase)*3.0)),0,3);
+                index=(index+1)%4;
+                edit(kStepRatchetBase,static_cast<double>(index)/3.0);
+            }
+            break;
+        }
+        case 5:
+            edit(kStepProbabilityBase, reset ? 1.0 :
+                 (where.x-zoneLeft)/widths[zone]);
+            break;
+        case 6: {
+            if (reset) {
+                edit(kStepOctaveBase,0.5);
+            } else {
+                int index=std::clamp(static_cast<int>(std::lround(current(kStepOctaveBase)*4.0)),0,4);
+                index += where.x < zoneLeft+widths[zone]*0.5 ? -1 : 1;
+                index=std::clamp(index,0,4);
+                edit(kStepOctaveBase,static_cast<double>(index)/4.0);
+            }
+            break;
+        }
+        case 7:
+            edit(kStepLockBase, reset ? 0.0 : (current(kStepLockBase)>=0.5?0.0:1.0));
+            break;
+    }
+
+    invalid();
+    return VSTGUI::kMouseDownEventHandledButDontNeedMovedOrUpEvents;
+}
+
 UIScaleView::UIScaleView(const VSTGUI::CRect& size,
                          VSTGUI::VST3Editor* editor,
                          Controller* controller)
@@ -437,6 +645,7 @@ VSTGUI::CView* createCustomView(VSTGUI::UTF8StringPtr name,
     if(std::strcmp(name,"ArpKnob")==0 && tag>=0) return new KnobView(rect,editor,tag);
     if(std::strcmp(name,"ArpUIScale")==0) return new UIScaleView(rect,editor,controller);
     if(std::strcmp(name,"ArpStepGrid")==0) return new StepGridView(rect,controller);
+    if(std::strcmp(name,"ArpSelectedStep")==0) return new SelectedStepView(rect,controller);
     if(std::strcmp(name,"ArpVariate")==0 && tag>=0) return new ActionButton(rect,controller,tag,"VARIATE");
 
     if(std::strcmp(name,"ArpMode")==0) return new SelectorView(rect,editor,tag,{"UP","DOWN","UP-DOWN","DOWN-UP","PLAYED","RANDOM"});
