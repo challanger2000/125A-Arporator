@@ -482,9 +482,11 @@ void Processor::applyNormalizedParameter(ParamID id, double value) noexcept {
         state_.variationLocks.note = value >= 0.5;
         state_.settings.evolveLocks.note = state_.variationLocks.note;
     } else if (id == kVariateTriggerId) {
-        const double previous = variateTrigger_;
-        variateTrigger_ = value;
-        if (value >= 0.5 && previous < 0.5) {
+        // Treat every actual toggle as one Variate action. A momentary 1->0
+        // pair can be coalesced by hosts to the final value before process(),
+        // making the action disappear. Toggling state avoids that host issue.
+        if (std::abs(value - variateTrigger_) > 0.25) {
+            variateTrigger_ = value;
             VariationRequest request {};
             request.amount = state_.variationAmount;
             request.locks = state_.variationLocks;
