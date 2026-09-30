@@ -149,7 +149,10 @@ void LogoView::draw(VSTGUI::CDrawContext* c) {
 KnobView::KnobView(const VSTGUI::CRect& size,
                    VSTGUI::IControlListener* listener,
                    std::int32_t tag)
-: VSTGUI::CKnob(size,listener,tag,nullptr) {
+: VSTGUI::CKnob(size,listener,tag,nullptr,nullptr) {
+    setStartAngle(static_cast<float>(135.0/180.0*kPi));
+    setRangeAngle(static_cast<float>(270.0/180.0*kPi));
+    setWantsFocus(true);
     setTransparency(true);
 }
 
