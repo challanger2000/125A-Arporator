@@ -441,7 +441,7 @@ void SelectedStepView::draw(VSTGUI::CDrawContext* c) {
     const int octaveValue = static_cast<int>(std::lround(octave * 4.0)) - 2;
 
     const double gap = 8.0;
-    const double widths[8] = {64,82,104,104,82,112,82,72};
+    const double widths[8] = {64,82,96,96,82,104,78,70};
     const double controlTop = r.top + 22.0;
     double x = r.left;
 
@@ -534,7 +534,7 @@ VSTGUI::CMouseEventResult SelectedStepView::onMouseDown(
     const auto r = getViewSize();
     const int step = controller_->selectedStep();
     const double gap = 8.0;
-    const double widths[8] = {64,82,104,104,82,112,82,72};
+    const double widths[8] = {64,82,96,96,82,104,78,70};
 
     int zone = -1;
     double zoneLeft = r.left;
