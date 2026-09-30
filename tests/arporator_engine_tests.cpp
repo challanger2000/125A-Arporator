@@ -419,7 +419,7 @@ int main() {
     settings.strum = 1.0f;
     engine.setSettings(settings);
     engine.reset();
-    engine.process(48000.0, 120.0, 13000,
+    engine.process(48000.0, 120.0, 14000,
                    {
                        {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
                        {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f},
