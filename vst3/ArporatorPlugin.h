@@ -75,6 +75,7 @@ private:
 
     double sampleRate_ {48000.0};
     bool settingsDirty_ {true};
+    bool variateParametersDirty_ {false};
     double variateTrigger_ {0.0};
     bool hadTransportState_ {false};
     bool wasPlaying_ {false};
