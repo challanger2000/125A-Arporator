@@ -67,7 +67,12 @@ int main() {
                    out);
     auto restart = noteOns(out);
     CHECK(!restart.empty());
-    CHECK(out.front().sampleOffset == 250);
+    bool restartAt250 = false;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn && e.sampleOffset == 250)
+            restartAt250 = true;
+    }
+    CHECK(restartAt250);
     CHECK(engine.running());
 
     // Arbitrary pattern lengths 1..32 are legal, including odd lengths.
@@ -128,6 +133,91 @@ int main() {
     CHECK(!chronological.empty());
     CHECK(out.front().sampleOffset == 100);
     CHECK(!engine.running());
+
+    // Continue mode: adding a note must not restart the running phrase.
+    settings = Settings{};
+    settings.patternLength = 8;
+    settings.stepsPerQuarter = 4.0;
+    settings.mode = Mode::Up;
+    settings.restartOnTrigger = false;
+    settings.scalePolicy = ScalePolicy::ChordOnly;
+    for (auto& s : settings.steps) {
+        s.enabled = true;
+        s.velocity = 1.0f;
+        s.gate = 0.5f;
+        s.ratchet = 1;
+        s.probability = 1.0f;
+    }
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 7000,
+                   {
+                       {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                       {MidiInput::Type::NoteOn, 1000, 0, 64, 1.0f}
+                   },
+                   out);
+    auto continued = noteOns(out);
+    CHECK(continued.size() == 2);
+    CHECK(continued[0] == 60);
+    CHECK(continued[1] == 64);
+    bool restartedAt1000 = false;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn && e.sampleOffset == 1000)
+            restartedAt1000 = true;
+    }
+    CHECK(!restartedAt1000);
+
+    // Swing delays odd-numbered steps without moving Step 1.
+    settings.restartOnTrigger = true;
+    settings.swing = 0.5f;
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 8000,
+                   {
+                       {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f}
+                   },
+                   out);
+    std::vector<int> onOffsets;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn)
+            onOffsets.push_back(e.sampleOffset);
+    }
+    CHECK(onOffsets.size() == 2);
+    CHECK(onOffsets[0] == 0);
+    CHECK(onOffsets[1] == 7470);
+
+    // Direction modes use the held chord deterministically.
+    auto collectMode = [&](Mode mode, int samples) {
+        Settings m = settings;
+        m.mode = mode;
+        m.swing = 0.0f;
+        m.restartOnTrigger = true;
+        m.patternLength = 8;
+        engine.setSettings(m);
+        engine.reset();
+        engine.process(48000.0, 120.0, samples,
+                       {
+                           {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                           {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f},
+                           {MidiInput::Type::NoteOn, 0, 0, 67, 1.0f}
+                       },
+                       out);
+        return noteOns(out);
+    };
+
+    auto up = collectMode(Mode::Up, 19000);
+    CHECK(up.size() >= 4);
+    CHECK(up[0] == 60 && up[1] == 64 && up[2] == 67 && up[3] == 60);
+
+    auto down = collectMode(Mode::Down, 19000);
+    CHECK(down.size() >= 4);
+    CHECK(down[0] == 67 && down[1] == 64 && down[2] == 60 && down[3] == 67);
+
+    auto upDown = collectMode(Mode::UpDown, 25000);
+    CHECK(upDown.size() >= 5);
+    CHECK(upDown[0] == 60 && upDown[1] == 64 && upDown[2] == 67 &&
+          upDown[3] == 64 && upDown[4] == 60);
 
     std::cout << "ArporatorEngineTests PASS\n";
     return EXIT_SUCCESS;
