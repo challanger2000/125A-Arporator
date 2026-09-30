@@ -396,10 +396,14 @@ void StepGridView::draw(VSTGUI::CDrawContext* c) {
                 : VSTGUI::CColor{137,143,151,210});
             c->drawString(rt,{cell.left+4,cell.top+18,cell.right-4,cell.top+31},VSTGUI::kLeftText);
         }
-        if (probability<0.999) {
+        {
+            // Probability is always visible so the neutral P100 state can be
+            // edited directly without requiring Variate or a right-click.
             char pr[8]{};
             std::snprintf(pr,sizeof(pr),"P%d",static_cast<int>(std::lround(probability*100.0)));
-            c->setFontColor(kAmber);
+            c->setFontColor(probability<0.999
+                ? kAmber
+                : VSTGUI::CColor{137,143,151,210});
             c->drawString(pr,{cell.left+4,cell.top+18,cell.right-4,cell.top+31},VSTGUI::kRightText);
         }
     }
@@ -680,14 +684,19 @@ VSTGUI::CMouseEventResult StepGridView::onMouseUp(
         const double probability=
             controller_->getParamNormalized(kStepProbabilityBase+dragStep_);
 
-        // Visible secondary markers are directly interactive. Their hit zones
-        // deliberately match the marker row so normal step ON/OFF clicks remain
-        // unchanged everywhere else.
-        if (localY>=16.0 && localY<=34.0 &&
-            localX<cellW*0.50) {
+        // All detailed per-step editing is available with the left mouse
+        // button so hosts such as Studio One may reserve right-click without
+        // making any Arporator function inaccessible.
+        if (localY<16.0) {
+            // The step number is the left-click entry point for the complete
+            // compact detail menu: Note, Ratchet, Probability, Octave, Lock,
+            // and Reset Step.
+            showStepMenu(dragStep_,where);
+        } else if (localY>=16.0 && localY<=34.0 &&
+                   localX<cellW*0.50) {
             showRatchetMenu(dragStep_,where);
         } else if (localY>=16.0 && localY<=34.0 &&
-                   localX>=cellW*0.50 && probability<0.999) {
+                   localX>=cellW*0.50) {
             showProbabilityMenu(dragStep_,where);
         } else {
             const auto id=static_cast<Steinberg::Vst::ParamID>(
