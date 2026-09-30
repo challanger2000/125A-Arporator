@@ -78,6 +78,7 @@ private:
     double variateTrigger_ {0.0};
     bool hadTransportState_ {false};
     bool wasPlaying_ {false};
+    int lastPlayheadPublished_ {-1};
 };
 
 class Controller final :
@@ -92,6 +93,9 @@ public:
     Steinberg::tresult PLUGIN_API initialize(Steinberg::FUnknown* context) override;
     Steinberg::tresult PLUGIN_API setComponentState(
         Steinberg::IBStream* state) override;
+    Steinberg::tresult PLUGIN_API setParamNormalized(
+        Steinberg::Vst::ParamID tag,
+        Steinberg::Vst::ParamValue value) override;
     Steinberg::tresult PLUGIN_API setState(Steinberg::IBStream* state) override;
     Steinberg::tresult PLUGIN_API getState(Steinberg::IBStream* state) override;
     Steinberg::IPlugView* PLUGIN_API createView(Steinberg::FIDString name) override;
