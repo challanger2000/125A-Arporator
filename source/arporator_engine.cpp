@@ -96,6 +96,7 @@ void Engine::reset() noexcept {
     nextStepSample_ = 0.0;
     lastStepDuration_ = 0.0;
     currentStep_ = 0;
+    lastEmittedStep_ = -1;
     directionIndex_ = 0;
     directionSign_ = 1;
     running_ = false;
@@ -407,6 +408,7 @@ void Engine::stopAll(double when,
 void Engine::emitStep(double stepSample,
                       double stepDuration) noexcept {
     const int stepIndex = clampInt(currentStep_, 0, settings_.patternLength - 1);
+    lastEmittedStep_ = stepIndex;
     const auto& baseStep = settings_.steps[static_cast<std::size_t>(stepIndex)];
     Step step = baseStep;
 
