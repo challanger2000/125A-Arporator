@@ -120,6 +120,21 @@ bool writeRuntimeState(IBStream* state, const RuntimeState& runtime) noexcept {
         }
     }
 
+    if (!s.writeInt32(runtime.variationBaseValid ? 1 : 0))
+        return false;
+    for (const auto& step : runtime.variationBaseSteps) {
+        if (!s.writeInt32(step.enabled ? 1 : 0) ||
+            !s.writeInt32(step.locked ? 1 : 0) ||
+            !s.writeInt32(static_cast<int32>(step.noteOffset)) ||
+            !s.writeDouble(step.velocity) ||
+            !s.writeDouble(step.gate) ||
+            !s.writeInt32(static_cast<int32>(step.ratchet)) ||
+            !s.writeDouble(step.probability) ||
+            !s.writeInt32(static_cast<int32>(step.octaveOffset))) {
+            return false;
+        }
+    }
+
     return true;
 }
 
@@ -276,6 +291,50 @@ bool readRuntimeState(IBStream* state, RuntimeState& runtime) noexcept {
             static_cast<std::int8_t>(std::clamp(octave, -2, 2));
     }
 
+    if (version >= 6) {
+        int32 baseValid = 0;
+        if (!s.readInt32(baseValid))
+            return false;
+        clean.variationBaseValid = baseValid != 0;
+
+        for (auto& step : clean.variationBaseSteps) {
+            int32 enabled = 1;
+            int32 locked = 0;
+            int32 noteOffset = 0;
+            int32 ratchet = 1;
+            int32 octave = 0;
+            double velocity = 1.0;
+            double gate = 1.0;
+            double probability = 1.0;
+
+            if (!s.readInt32(enabled) ||
+                !s.readInt32(locked) ||
+                !s.readInt32(noteOffset) ||
+                !s.readDouble(velocity) ||
+                !s.readDouble(gate) ||
+                !s.readInt32(ratchet) ||
+                !s.readDouble(probability) ||
+                !s.readInt32(octave)) {
+                return false;
+            }
+
+            step.enabled = enabled != 0;
+            step.locked = locked != 0;
+            step.noteOffset =
+                static_cast<std::int8_t>(std::clamp(noteOffset, -4, 4));
+            step.velocity =
+                static_cast<float>(std::clamp(velocity, 0.0, 1.0));
+            step.gate =
+                static_cast<float>(std::clamp(gate, 0.01, 1.0));
+            step.ratchet =
+                static_cast<std::uint8_t>(std::clamp(ratchet, 1, 4));
+            step.probability =
+                static_cast<float>(std::clamp(probability, 0.0, 1.0));
+            step.octaveOffset =
+                static_cast<std::int8_t>(std::clamp(octave, -2, 2));
+        }
+    }
+
     runtime = clean;
     return true;
 }
@@ -392,6 +451,7 @@ void Processor::applyRuntimeState(const RuntimeState& state) noexcept {
     state_.settings.evolveLocks = state_.variationLocks;
     engine_.setSettings(state_.settings);
     variateTrigger_ = 0.0;
+    variateResetTrigger_ = 0.0;
     settingsDirty_ = false;
 }
 
@@ -482,19 +542,36 @@ void Processor::applyNormalizedParameter(ParamID id, double value) noexcept {
         state_.variationLocks.note = value >= 0.5;
         state_.settings.evolveLocks.note = state_.variationLocks.note;
     } else if (id == kVariateTriggerId) {
-        // Treat every actual toggle as one Variate action. A momentary 1->0
-        // pair can be coalesced by hosts to the final value before process(),
-        // making the action disappear. Toggling state avoids that host issue.
         if (std::abs(value - variateTrigger_) > 0.25) {
             variateTrigger_ = value;
+
+            if (!state_.variationBaseValid) {
+                state_.variationBaseSteps = state_.settings.steps;
+                state_.variationBaseValid = true;
+                state_.variationCounter = 0u;
+            }
+
             VariationRequest request {};
             request.amount = state_.variationAmount;
             request.locks = state_.variationLocks;
             ++state_.variationCounter;
             request.seed = state_.settings.randomSeed ^
                 (0x9E3779B9u * state_.variationCounter);
-            state_.settings = variateSettings(state_.settings, request);
+
+            auto base = state_.settings;
+            base.steps = state_.variationBaseSteps;
+            state_.settings = variateSettings(base, request);
             variateParametersDirty_ = true;
+        }
+    } else if (id == kVariateResetId) {
+        if (std::abs(value - variateResetTrigger_) > 0.25) {
+            variateResetTrigger_ = value;
+            if (state_.variationBaseValid) {
+                state_.settings.steps = state_.variationBaseSteps;
+                state_.variationBaseValid = false;
+                state_.variationCounter = 0u;
+                variateParametersDirty_ = true;
+            }
         }
     } else if (id >= kStepEnableBase &&
                id < kStepEnableBase + kStepParamCount) {
@@ -553,7 +630,7 @@ void Processor::readParameterChanges(IParameterChanges* changes) noexcept {
 
         // Trigger parameters must consume every point so a short 0->1->0 pulse
         // inside one host block cannot disappear when only the final value is 0.
-        if (id == kVariateTriggerId) {
+        if (id == kVariateTriggerId || id == kVariateResetId) {
             for (int32 point = 0; point < queue->getPointCount(); ++point) {
                 int32 sampleOffset = 0;
                 ParamValue value = 0.0;
@@ -985,6 +1062,12 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
     variate->appendString(STR16("VARIATE"));
     parameters.addParameter(variate);
 
+    auto* variateReset = new StringListParameter(
+        STR16("Variate Reset"), kVariateResetId);
+    variateReset->appendString(STR16("READY"));
+    variateReset->appendString(STR16("RESET"));
+    parameters.addParameter(variateReset);
+
     for (int i = 0; i < kStepParamCount; ++i) {
         auto enableTitle = makeStepTitle(i, u"On");
         auto* enabled =
@@ -1103,6 +1186,7 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* state) {
     setNorm(kLockOctaveId, runtime.variationLocks.octave ? 1.0 : 0.0);
     setNorm(kLockNoteId, runtime.variationLocks.note ? 1.0 : 0.0);
     setNorm(kVariateTriggerId, 0.0);
+    setNorm(kVariateResetId, 0.0);
     setNorm(kPlayheadId, 0.0);
 
     for (int i = 0; i < kStepParamCount; ++i) {
@@ -1153,7 +1237,7 @@ tresult PLUGIN_API Controller::setState(IBStream* state) {
         return kResultOk;
     if (!stream.readInt32(selected))
         selected = 0;
-    guiZoom_ = zoom >= 1.25 ? 1.5 : 1.0;
+    guiZoom_ = zoom >= 1.35 ? 1.5 : (zoom >= 1.10 ? 1.2 : 1.0);
     selectedStep_ = std::clamp<int32>(selected, 0, kStepParamCount - 1);
     if (editor_)
         editor_->setZoomFactor(guiZoom_);
@@ -1209,7 +1293,7 @@ void Controller::willClose(VSTGUI::VST3Editor* editor) {
 }
 
 void Controller::setGuiZoom(double zoom) {
-    guiZoom_ = zoom >= 1.25 ? 1.5 : 1.0;
+    guiZoom_ = zoom >= 1.35 ? 1.5 : (zoom >= 1.10 ? 1.2 : 1.0);
     if (editor_ && std::abs(editor_->getZoomFactor() - guiZoom_) > 1.0e-9)
         editor_->setZoomFactor(guiZoom_);
 }
