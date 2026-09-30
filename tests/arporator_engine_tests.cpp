@@ -769,6 +769,29 @@ int main() {
     CHECK(!lydianConstrained.empty());
     CHECK(lydianConstrained[0] == 66);
 
+    // Playhead state follows the sequencer position even when a step emits no
+    // note (disabled/probability 0), and reset returns it to OFF (-1).
+    settings = Settings{};
+    settings.patternLength = 3;
+    settings.stepsPerQuarter = 4.0;
+    settings.restartOnTrigger = true;
+    settings.steps[0].enabled = true;
+    settings.steps[1].enabled = false;
+    settings.steps[2].enabled = true;
+    settings.steps[2].probability = 0.0f;
+    engine.setSettings(settings);
+    engine.reset();
+    CHECK(engine.lastEmittedStep() == -1);
+    engine.process(48000.0, 120.0, 6500,
+                   {{MidiInput::Type::NoteOn, 0, 0, 60, 1.0f}},
+                   out);
+    CHECK(engine.lastEmittedStep() == 1);
+    engine.process(48000.0, 120.0, 6000, {}, out);
+    CHECK(engine.lastEmittedStep() == 2);
+    engine.reset();
+    CHECK(engine.lastEmittedStep() == -1);
+    CHECK(!engine.running());
+
     std::cout << "ArporatorEngineTests PASS\n";
     return EXIT_SUCCESS;
 }
