@@ -55,7 +55,7 @@ grid = custom["ArpStepGrid"][0]
 gw, gh = pair(grid.attrib["size"])
 assert gw >= 1000 and gh >= 240, f"direct-edit step grid became too small: {gw}x{gh}"
 
-# Seven global dimension locks are required by the V0.1 behaviour contract.
+# Seven global dimension locks are required by the V1.0 behaviour contract.
 lock_tags = sorted(
     int(v.attrib["control-tag"])
     for v in custom.get("ArpLock", [])
