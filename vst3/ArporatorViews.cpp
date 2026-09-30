@@ -371,9 +371,18 @@ void StepGridView::draw(VSTGUI::CDrawContext* c) {
         c->setFontColor(inLength?kText:kMuted);
         c->drawString(num,{cell.left+3,cell.top+2,cell.right-3,cell.top+15},VSTGUI::kLeftText);
 
-        const double barW=(cellW-8.0)*std::clamp(velocity,0.0,1.0);
+        const double velocityH=(cellH-25.0)*std::clamp(velocity,0.0,1.0);
+        c->setFillColor({86,154,220,125});
+        c->drawRect(
+            {cell.left+5,cell.bottom-10-velocityH,cell.left+10,cell.bottom-10},
+            VSTGUI::kDrawFilled);
+
+        const double gate=controller_->getParamNormalized(kStepGateBase+i);
+        const double gateW=(cellW-16.0)*std::clamp(gate,0.0,1.0);
         c->setFillColor(kAccent);
-        c->drawRect({cell.left+4,cell.bottom-7,cell.left+4+barW,cell.bottom-4},VSTGUI::kDrawFilled);
+        c->drawRect(
+            {cell.left+13,cell.bottom-7,cell.left+13+gateW,cell.bottom-4},
+            VSTGUI::kDrawFilled);
 
         if (ratchet>1) {
             char rt[8]{};
@@ -391,23 +400,205 @@ void StepGridView::draw(VSTGUI::CDrawContext* c) {
     setDirty(false);
 }
 
-VSTGUI::CMouseEventResult StepGridView::onMouseDown(
-    VSTGUI::CPoint& where,const VSTGUI::CButtonState& buttons) {
-    if (!controller_ || !buttons.isLeftButton() || !getViewSize().pointInside(where))
-        return VSTGUI::kMouseEventNotHandled;
+int StepGridView::stepAt(const VSTGUI::CPoint& where) const noexcept {
     const auto r=getViewSize();
+    if (!r.pointInside(where))
+        return -1;
+
     const double gap=5.0;
     const double cellW=(r.getWidth()-15.0*gap)/16.0;
     const double cellH=(r.getHeight()-gap)/2.0;
     const int col=std::clamp(static_cast<int>((where.x-r.left)/(cellW+gap)),0,15);
     const int row=std::clamp(static_cast<int>((where.y-r.top)/(cellH+gap)),0,1);
-    const int step=row*16+col;
+    const double cellLeft=r.left+col*(cellW+gap);
+    const double cellTop=r.top+row*(cellH+gap);
+
+    if (where.x>cellLeft+cellW || where.y>cellTop+cellH)
+        return -1;
+    return row*16+col;
+}
+
+void StepGridView::showStepMenu(int step, const VSTGUI::CPoint& where) {
+    if (!controller_ || !getFrame() || step<0 || step>=kStepParamCount)
+        return;
+
+    auto* menu=new VSTGUI::COptionMenu();
+    auto* note=new VSTGUI::COptionMenu();
+    auto* ratchet=new VSTGUI::COptionMenu();
+    auto* probability=new VSTGUI::COptionMenu();
+    auto* octave=new VSTGUI::COptionMenu();
+
+    for (int i=-4;i<=4;++i) {
+        char text[24]{};
+        std::snprintf(text,sizeof(text),"%+d",i);
+        note->addEntry(new VSTGUI::CMenuItem(text,100+(i+4)));
+    }
+    for (int i=1;i<=4;++i) {
+        char text[24]{};
+        std::snprintf(text,sizeof(text),"%dx",i);
+        ratchet->addEntry(new VSTGUI::CMenuItem(text,200+(i-1)));
+    }
+    static constexpr int probs[5]={0,25,50,75,100};
+    for (int i=0;i<5;++i) {
+        char text[24]{};
+        std::snprintf(text,sizeof(text),"%d%%",probs[i]);
+        probability->addEntry(new VSTGUI::CMenuItem(text,300+i));
+    }
+    for (int i=-2;i<=2;++i) {
+        char text[24]{};
+        std::snprintf(text,sizeof(text),"%+d",i);
+        octave->addEntry(new VSTGUI::CMenuItem(text,400+(i+2)));
+    }
+
+    menu->addEntry(note,"Note");
+    menu->addEntry(ratchet,"Ratchet");
+    menu->addEntry(probability,"Probability");
+    menu->addEntry(octave,"Octave");
+    menu->addSeparator();
+    menu->addEntry(new VSTGUI::CMenuItem("Toggle Lock",500));
+    menu->addEntry(new VSTGUI::CMenuItem("Reset Step",501));
+
     controller_->setSelectedStep(step);
 
-    // Selection is deliberately non-destructive. ON/OFF is edited only in the
-    // selected-step panel so browsing steps never changes MIDI output.
+    menu->popup(getFrame(),where,[this,step](VSTGUI::COptionMenu* selectedMenu){
+        if (!controller_ || !selectedMenu)
+            return;
+
+        int idx=-1;
+        auto* actual=selectedMenu->getLastItemMenu(idx);
+        if (!actual || idx<0)
+            return;
+        auto* item=actual->getEntry(idx);
+        if (!item)
+            return;
+
+        const int tag=item->getTag();
+        const auto edit=[&](Steinberg::Vst::ParamID base,double n){
+            controller_->editParameter(
+                static_cast<Steinberg::Vst::ParamID>(base+step),
+                std::clamp(n,0.0,1.0));
+        };
+
+        if (tag>=100 && tag<=108)
+            edit(kStepNoteBase,static_cast<double>(tag-100)/8.0);
+        else if (tag>=200 && tag<=203)
+            edit(kStepRatchetBase,static_cast<double>(tag-200)/3.0);
+        else if (tag>=300 && tag<=304) {
+            static constexpr double p[5]={0.0,0.25,0.50,0.75,1.0};
+            edit(kStepProbabilityBase,p[tag-300]);
+        } else if (tag>=400 && tag<=404)
+            edit(kStepOctaveBase,static_cast<double>(tag-400)/4.0);
+        else if (tag==500) {
+            const auto id=static_cast<Steinberg::Vst::ParamID>(kStepLockBase+step);
+            edit(kStepLockBase,controller_->getParamNormalized(id)>=0.5?0.0:1.0);
+        } else if (tag==501) {
+            edit(kStepEnableBase,1.0);
+            edit(kStepNoteBase,0.5);
+            edit(kStepVelocityBase,1.0);
+            edit(kStepGateBase,1.0);
+            edit(kStepRatchetBase,0.0);
+            edit(kStepProbabilityBase,1.0);
+            edit(kStepOctaveBase,0.5);
+            edit(kStepLockBase,0.0);
+        }
+
+        invalid();
+    });
+    menu->forget();
+}
+
+VSTGUI::CMouseEventResult StepGridView::onMouseDown(
+    VSTGUI::CPoint& where,const VSTGUI::CButtonState& buttons) {
+    if (!controller_)
+        return VSTGUI::kMouseEventNotHandled;
+
+    const int step=stepAt(where);
+    if (step<0)
+        return VSTGUI::kMouseEventNotHandled;
+
+    const int length=1+static_cast<int>(std::lround(
+        controller_->getParamNormalized(kPatternLengthId)*31.0));
+    if (step>=length)
+        return VSTGUI::kMouseEventNotHandled;
+
+    controller_->setSelectedStep(step);
+
+    if (buttons.isRightButton()) {
+        showStepMenu(step,where);
+        return VSTGUI::kMouseDownEventHandledButDontNeedMovedOrUpEvents;
+    }
+    if (!buttons.isLeftButton())
+        return VSTGUI::kMouseEventNotHandled;
+
+    dragStep_=step;
+    dragStart_=where;
+    dragStartVelocity_=controller_->getParamNormalized(
+        static_cast<Steinberg::Vst::ParamID>(kStepVelocityBase+step));
+    dragStartGate_=controller_->getParamNormalized(
+        static_cast<Steinberg::Vst::ParamID>(kStepGateBase+step));
+    dragAxis_=DragAxis::None;
+    dragged_=false;
+    return VSTGUI::kMouseEventHandled;
+}
+
+VSTGUI::CMouseEventResult StepGridView::onMouseMoved(
+    VSTGUI::CPoint& where,const VSTGUI::CButtonState& buttons) {
+    if (!controller_ || dragStep_<0 || !buttons.isLeftButton())
+        return VSTGUI::kMouseEventNotHandled;
+
+    const double dx=where.x-dragStart_.x;
+    const double dy=where.y-dragStart_.y;
+    if (dragAxis_==DragAxis::None) {
+        if (std::abs(dx)<3.0 && std::abs(dy)<3.0)
+            return VSTGUI::kMouseEventHandled;
+        dragAxis_=std::abs(dy)>=std::abs(dx)
+            ? DragAxis::Velocity
+            : DragAxis::Gate;
+        dragged_=true;
+    }
+
+    const auto r=getViewSize();
+    const double gap=5.0;
+    const double cellW=(r.getWidth()-15.0*gap)/16.0;
+    const double cellH=(r.getHeight()-gap)/2.0;
+    const auto snap=[](double n) {
+        n=std::clamp(n,0.0,1.0);
+        if (n>=0.95) return 1.0;
+        if (n<=0.02) return 0.0;
+        return n;
+    };
+
+    if (dragAxis_==DragAxis::Velocity) {
+        controller_->editParameter(
+            static_cast<Steinberg::Vst::ParamID>(kStepVelocityBase+dragStep_),
+            snap(dragStartVelocity_-dy/cellH));
+    } else {
+        controller_->editParameter(
+            static_cast<Steinberg::Vst::ParamID>(kStepGateBase+dragStep_),
+            snap(dragStartGate_+dx/cellW));
+    }
+
     invalid();
-    return VSTGUI::kMouseDownEventHandledButDontNeedMovedOrUpEvents;
+    return VSTGUI::kMouseEventHandled;
+}
+
+VSTGUI::CMouseEventResult StepGridView::onMouseUp(
+    VSTGUI::CPoint&,const VSTGUI::CButtonState&) {
+    if (!controller_ || dragStep_<0)
+        return VSTGUI::kMouseEventNotHandled;
+
+    if (!dragged_) {
+        const auto id=static_cast<Steinberg::Vst::ParamID>(kStepEnableBase+dragStep_);
+        controller_->editParameter(
+            id,
+            controller_->getParamNormalized(id)>=0.5?0.0:1.0);
+    }
+
+    dragStep_=-1;
+    dragAxis_=DragAxis::None;
+    dragged_=false;
+    invalid();
+    return VSTGUI::kMouseEventHandled;
 }
 
 
