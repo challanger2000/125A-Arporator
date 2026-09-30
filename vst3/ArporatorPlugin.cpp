@@ -87,6 +87,7 @@ bool writeRuntimeState(IBStream* state, const RuntimeState& runtime) noexcept {
         !s.writeInt32(runtime.variationLocks.probability ? 1 : 0) ||
         !s.writeInt32(runtime.variationLocks.octave ? 1 : 0) ||
         !s.writeInt32(static_cast<int32>(runtime.variationCounter)) ||
+        !s.writeInt32(runtime.variationLocks.note ? 1 : 0) ||
         !s.writeInt32(runtime.settings.restartOnTrigger ? 1 : 0) ||
         !s.writeInt32(static_cast<int32>(runtime.settings.scalePolicy)) ||
         !s.writeInt32(runtime.settings.keyRoot) ||
@@ -98,6 +99,7 @@ bool writeRuntimeState(IBStream* state, const RuntimeState& runtime) noexcept {
     for (const auto& step : runtime.settings.steps) {
         if (!s.writeInt32(step.enabled ? 1 : 0) ||
             !s.writeInt32(step.locked ? 1 : 0) ||
+            !s.writeInt32(static_cast<int32>(step.noteOffset)) ||
             !s.writeDouble(step.velocity) ||
             !s.writeDouble(step.gate) ||
             !s.writeInt32(static_cast<int32>(step.ratchet)) ||
@@ -139,6 +141,7 @@ bool readRuntimeState(IBStream* state, RuntimeState& runtime) noexcept {
     int32 lockProbability = 0;
     int32 lockOctave = 0;
     int32 variationCounter = 0;
+    int32 lockNote = 0;
 
     if (!s.readInt32(magic) || magic != kStateMagic ||
         !s.readInt32(version) || version < 1 || version > kStateVersion ||
@@ -177,6 +180,9 @@ bool readRuntimeState(IBStream* state, RuntimeState& runtime) noexcept {
         }
     }
 
+    if (version >= 5 && !s.readInt32(lockNote))
+        return false;
+
     if (!s.readInt32(restart) ||
         !s.readInt32(scalePolicy) ||
         !s.readInt32(keyRoot) ||
@@ -212,6 +218,7 @@ bool readRuntimeState(IBStream* state, RuntimeState& runtime) noexcept {
     clean.variationLocks.ratchet = lockRatchet != 0;
     clean.variationLocks.probability = lockProbability != 0;
     clean.variationLocks.octave = lockOctave != 0;
+    clean.variationLocks.note = lockNote != 0;
     clean.variationCounter =
         variationCounter >= 0 ? static_cast<std::uint32_t>(variationCounter) : 0u;
     clean.settings.restartOnTrigger = restart != 0;
@@ -226,6 +233,7 @@ bool readRuntimeState(IBStream* state, RuntimeState& runtime) noexcept {
     for (auto& step : clean.settings.steps) {
         int32 enabled = 1;
         int32 locked = 0;
+        int32 noteOffset = 0;
         int32 ratchet = 1;
         int32 octave = 0;
         double velocity = 1.0;
@@ -234,6 +242,7 @@ bool readRuntimeState(IBStream* state, RuntimeState& runtime) noexcept {
 
         if (!s.readInt32(enabled) ||
             (version >= 3 && !s.readInt32(locked)) ||
+            (version >= 5 && !s.readInt32(noteOffset)) ||
             !s.readDouble(velocity) ||
             !s.readDouble(gate) ||
             !s.readInt32(ratchet) ||
@@ -244,6 +253,8 @@ bool readRuntimeState(IBStream* state, RuntimeState& runtime) noexcept {
 
         step.enabled = enabled != 0;
         step.locked = locked != 0;
+        step.noteOffset =
+            static_cast<std::int8_t>(std::clamp(noteOffset, -4, 4));
         step.velocity = static_cast<float>(std::clamp(velocity, 0.0, 1.0));
         step.gate = static_cast<float>(std::clamp(gate, 0.01, 1.0));
         step.ratchet =
@@ -446,6 +457,9 @@ void Processor::applyNormalizedParameter(ParamID id, double value) noexcept {
     } else if (id == kLockOctaveId) {
         state_.variationLocks.octave = value >= 0.5;
         state_.settings.evolveLocks.octave = state_.variationLocks.octave;
+    } else if (id == kLockNoteId) {
+        state_.variationLocks.note = value >= 0.5;
+        state_.settings.evolveLocks.note = state_.variationLocks.note;
     } else if (id == kVariateTriggerId) {
         const double previous = variateTrigger_;
         variateTrigger_ = value;
@@ -489,6 +503,11 @@ void Processor::applyNormalizedParameter(ParamID id, double value) noexcept {
                id < kStepLockBase + kStepParamCount) {
         const auto index = static_cast<std::size_t>(id - kStepLockBase);
         state_.settings.steps[index].locked = value >= 0.5;
+    } else if (id >= kStepNoteBase &&
+               id < kStepNoteBase + kStepParamCount) {
+        const auto index = static_cast<std::size_t>(id - kStepNoteBase);
+        state_.settings.steps[index].noteOffset =
+            static_cast<std::int8_t>(normIndex(value, 8) - 4);
     } else {
         return;
     }
@@ -818,6 +837,7 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
     addLock(STR16("Lock Ratchet"), kLockRatchetId);
     addLock(STR16("Lock Probability"), kLockProbabilityId);
     addLock(STR16("Lock Octave"), kLockOctaveId);
+    addLock(STR16("Lock Note"), kLockNoteId);
 
     auto* variate = new StringListParameter(
         STR16("Variate Trigger"), kVariateTriggerId);
@@ -854,6 +874,21 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
         parameters.addParameter(new RangeParameter(
             probabilityTitle.c_str(), kStepProbabilityBase + i, STR16("%"),
             0.0, 100.0, 100.0, 0));
+
+        auto noteTitle = makeStepTitle(i, u"Note");
+        auto* note =
+            new StringListParameter(noteTitle.c_str(), kStepNoteBase + i);
+        note->appendString(STR16("-4"));
+        note->appendString(STR16("-3"));
+        note->appendString(STR16("-2"));
+        note->appendString(STR16("-1"));
+        note->appendString(STR16("0"));
+        note->appendString(STR16("+1"));
+        note->appendString(STR16("+2"));
+        note->appendString(STR16("+3"));
+        note->appendString(STR16("+4"));
+        note->setNormalized(0.5);
+        parameters.addParameter(note);
 
         auto octaveTitle = makeStepTitle(i, u"Octave");
         auto* octave =
@@ -920,6 +955,7 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* state) {
     setNorm(kLockRatchetId, runtime.variationLocks.ratchet ? 1.0 : 0.0);
     setNorm(kLockProbabilityId, runtime.variationLocks.probability ? 1.0 : 0.0);
     setNorm(kLockOctaveId, runtime.variationLocks.octave ? 1.0 : 0.0);
+    setNorm(kLockNoteId, runtime.variationLocks.note ? 1.0 : 0.0);
     setNorm(kVariateTriggerId, 0.0);
 
     for (int i = 0; i < kStepParamCount; ++i) {
@@ -932,6 +968,8 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* state) {
         setNorm(kStepRatchetBase + i,
                 static_cast<double>(step.ratchet - 1) / 3.0);
         setNorm(kStepProbabilityBase + i, step.probability);
+        setNorm(kStepNoteBase + i,
+                static_cast<double>(step.noteOffset + 4) / 8.0);
         setNorm(kStepOctaveBase + i,
                 static_cast<double>(step.octaveOffset + 2) / 4.0);
         setNorm(kStepLockBase + i, step.locked ? 1.0 : 0.0);
