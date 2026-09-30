@@ -9,8 +9,8 @@
   <fonts>
     <font name="Title" font-name="Arial" size="25" bold="true" italic="false"/>
     <font name="Section" font-name="Arial" size="12" bold="true" italic="false"/>
-    <font name="Label" font-name="Arial" size="10" bold="true" italic="false"/>
-    <font name="Small" font-name="Arial" size="9" bold="false" italic="false"/>
+    <font name="Label" font-name="Arial" size="11" bold="true" italic="false"/>
+    <font name="Small" font-name="Arial" size="10" bold="false" italic="false"/>
   </fonts>
   <template name="view" class="CViewContainer" origin="0,0" size="1180,680" transparent="false" background-color="Background">
     <view class="CView" custom-view-name="ArpFaceplate" origin="0,0" size="1180,680" mouse-enabled="false"/>
@@ -19,11 +19,11 @@
     <view class="CTextLabel" origin="380,50" size="420,13" title="MUSICAL MIDI ARPEGGIATOR · V0.1" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
     <view class="CView" custom-view-name="ArpUIScale" origin="1068,30" size="68,24"/>
 
-    <view class="CTextLabel" origin="36,96" size="82,12" title="MODE" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CTextLabel" origin="36,95" size="82,14" title="MODE" transparent="true" font-color="Muted" font="Label" text-alignment="center"/>
     <view class="CView" custom-view-name="ArpMode" control-tag="1000" origin="28,112" size="98,28"/>
-    <view class="CTextLabel" origin="142,96" size="72,12" title="RATE" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CTextLabel" origin="142,95" size="72,14" title="RATE" transparent="true" font-color="Muted" font="Label" text-alignment="center"/>
     <view class="CView" custom-view-name="ArpRate" control-tag="1001" origin="138,112" size="80,28"/>
-    <view class="CTextLabel" origin="230,96" size="70,12" title="OCTAVES" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CTextLabel" origin="230,95" size="70,14" title="OCTAVES" transparent="true" font-color="Muted" font="Label" text-alignment="center"/>
     <view class="CView" custom-view-name="ArpOctaves" control-tag="1002" origin="234,112" size="62,28"/>
 
     <view class="CView" custom-view-name="ArpKnob" control-tag="1003" origin="316,101" size="66,60"/>
@@ -42,13 +42,13 @@
     <view class="CView" custom-view-name="ArpKnob" control-tag="1021" origin="832,101" size="66,60"/>
     <view class="CTextLabel" origin="824,158" size="82,12" title="EVOLVE" transparent="true" font-color="Text" font="Label" text-alignment="center"/>
 
-    <view class="CTextLabel" origin="916,92" size="84,12" title="TRIGGER" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CTextLabel" origin="916,91" size="84,14" title="TRIGGER" transparent="true" font-color="Muted" font="Label" text-alignment="center"/>
     <view class="CView" custom-view-name="ArpTrigger" control-tag="1006" origin="910,105" size="96,25"/>
-    <view class="CTextLabel" origin="1022,92" size="112,12" title="PITCH POLICY" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CTextLabel" origin="1022,91" size="112,14" title="PITCH POLICY" transparent="true" font-color="Muted" font="Label" text-alignment="center"/>
     <view class="CView" custom-view-name="ArpPolicy" control-tag="1007" origin="1016,105" size="124,25"/>
-    <view class="CTextLabel" origin="916,139" size="46,12" title="KEY" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CTextLabel" origin="916,138" size="46,14" title="KEY" transparent="true" font-color="Muted" font="Label" text-alignment="center"/>
     <view class="CView" custom-view-name="ArpKey" control-tag="1008" origin="914,152" size="50,25"/>
-    <view class="CTextLabel" origin="982,139" size="78,12" title="SCALE" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CTextLabel" origin="982,138" size="78,14" title="SCALE" transparent="true" font-color="Muted" font="Label" text-alignment="center"/>
     <view class="CView" custom-view-name="ArpScale" control-tag="1009" origin="974,152" size="94,25"/>
 
     <view class="CTextLabel" origin="40,226" size="210,16" title="PATTERN · 1–32 STEPS" transparent="true" font-color="Accent" font="Section"/>
@@ -61,7 +61,7 @@
     <view class="CView" custom-view-name="ArpKnob" control-tag="1013" origin="246,542" size="58,52"/>
     <view class="CTextLabel" origin="234,592" size="82,14" title="AMOUNT" transparent="true" font-color="Text" font="Label" text-alignment="center"/>
 
-    <view class="CTextLabel" origin="322,528" size="430,18" title="LOCK STATE · OPEN = MAY CHANGE · LOCK = PROTECTED" transparent="true" font-color="Accent" font="Section"/>
+    <view class="CTextLabel" origin="322,528" size="716,18" title="LOCK STATE · OPEN = MAY CHANGE · LOCK = PROTECTED" transparent="true" font-color="Accent" font="Section" text-alignment="center"/>
     <view class="CView" custom-view-name="ArpLock" control-tag="1014" origin="322,554" size="92,24"/>
     <view class="CTextLabel" origin="322,581" size="92,14" title="RHYTHM" transparent="true" font-color="Muted" font="Label" text-alignment="center"/>
     <view class="CView" custom-view-name="ArpLock" control-tag="1022" origin="426,554" size="92,24"/>
