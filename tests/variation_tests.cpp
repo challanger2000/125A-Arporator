@@ -16,6 +16,7 @@ static bool sameStep(const Step& a, const Step& b) {
            a.gate == b.gate &&
            a.ratchet == b.ratchet &&
            a.probability == b.probability &&
+           a.noteOffset == b.noteOffset &&
            a.octaveOffset == b.octaveOffset;
 }
 
@@ -43,6 +44,7 @@ int main() {
         step.gate = 0.60f + 0.01f * static_cast<float>(i % 8);
         step.ratchet = static_cast<std::uint8_t>(1 + (i % 4));
         step.probability = 0.65f + 0.01f * static_cast<float>(i % 7);
+        step.noteOffset = static_cast<std::int8_t>((i % 5) - 2);
         step.octaveOffset = static_cast<std::int8_t>((i % 3) - 1);
     }
 
@@ -98,6 +100,7 @@ int main() {
     dimensionLocked.locks.ratchet = true;
     dimensionLocked.locks.probability = true;
     dimensionLocked.locks.octave = true;
+    dimensionLocked.locks.note = true;
     const auto allLocked = variateSettings(base, dimensionLocked);
     for (int i = 0; i < base.patternLength; ++i)
         CHECK(sameStep(allLocked.steps[static_cast<std::size_t>(i)],
