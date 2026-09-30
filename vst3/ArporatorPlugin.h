@@ -126,7 +126,7 @@ public:
 private:
     static std::uint16_t scaleMaskForMode(int index) noexcept;
 
-    double guiZoom_ {1.0};
+    double guiZoom_ {1.2};
     int selectedStep_ {0};
     VSTGUI::VST3Editor* editor_ {nullptr};
 };
