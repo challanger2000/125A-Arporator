@@ -41,6 +41,7 @@ required = {
     "ArpUIScale": 1,
     "ArpStepGrid": 1,
     "ArpVariate": 1,
+    "ArpVariateReset": 1,
 }
 for name, count in required.items():
     actual = len(custom.get(name, []))
@@ -67,7 +68,7 @@ assert lock_tags == expected_locks, (
 
 # Critical global control tags must occur exactly once in the custom UI.
 critical_tags = [1000,1001,1002,1003,1004,1005,1006,1007,1008,1009,
-                 1010,1011,1012,1013,1020,1021]
+                 1010,1011,1012,1013,1020,1021,1024]
 counts = {tag: 0 for tag in critical_tags}
 for view in views:
     if "control-tag" not in view.attrib:
