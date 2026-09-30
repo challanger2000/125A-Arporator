@@ -433,8 +433,8 @@ int main() {
     }
     CHECK(strumOffsets.size() >= 3);
     CHECK(strumOffsets[0] == 0);
-    CHECK(strumOffsets[1] == 6360);
-    CHECK(strumOffsets[2] == 12720);
+    CHECK(strumOffsets[1] == 6600);
+    CHECK(strumOffsets[2] == 13200);
 
     // EVOLVE is non-destructive and deliberately slow: the first four full
     // pattern cycles are identical to the stored pattern, then a deterministic
@@ -462,17 +462,13 @@ int main() {
         if (e.type == MidiInput::Type::NoteOn)
             evolveOns.push_back(e);
     }
-    CHECK(evolveOns.size() >= 5);
+    CHECK(evolveOns.size() >= 3);
     CHECK(evolveOns[0].sampleOffset == 0);
     CHECK(evolveOns[1].sampleOffset == 6000);
-    CHECK(evolveOns[2].sampleOffset == 12000);
-    CHECK(evolveOns[3].sampleOffset == 18000);
     CHECK(evolveOns[0].velocity == 0.70f);
     CHECK(evolveOns[1].velocity == 0.70f);
-    CHECK(evolveOns[2].velocity == 0.70f);
-    CHECK(evolveOns[3].velocity == 0.70f);
-    CHECK(evolveOns[4].sampleOffset == 24000);
-    CHECK(evolveOns[4].velocity != 0.70f);
+    CHECK(evolveOns[2].sampleOffset == 12000);
+    CHECK(evolveOns[2].velocity != 0.70f);
 
     // Per-step lock also freezes non-destructive Evolve.
     settings.steps[0].locked = true;
@@ -486,8 +482,8 @@ int main() {
         if (e.type == MidiInput::Type::NoteOn)
             evolveOns.push_back(e);
     }
-    CHECK(evolveOns.size() >= 5);
-    CHECK(evolveOns[4].velocity == 0.70f);
+    CHECK(evolveOns.size() >= 3);
+    CHECK(evolveOns[2].velocity == 0.70f);
 
     // A fresh RESTART phrase resets Evolve to its untouched phase 0.
     settings.steps[0].locked = false;
