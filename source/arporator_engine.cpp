@@ -102,23 +102,26 @@ bool Engine::stepPassesProbability(int step) noexcept {
     return unit < s.probability;
 }
 
-std::vector<int> Engine::orderedPitches(int channel) const {
-    std::vector<int> result;
+int Engine::collectOrderedPitches(
+    int channel,
+    std::array<int, kMidiNotes>& out) const noexcept {
     channel = clampInt(channel, 0, 15);
-    result.reserve(16);
+    int count = 0;
     for (int pitch = 0; pitch < kMidiNotes; ++pitch) {
-        if (held_[static_cast<std::size_t>(channel)][static_cast<std::size_t>(pitch)].count > 0)
-            result.push_back(pitch);
+        if (held_[static_cast<std::size_t>(channel)]
+                 [static_cast<std::size_t>(pitch)].count > 0) {
+            out[static_cast<std::size_t>(count++)] = pitch;
+        }
     }
-    return result;
+    return count;
 }
 
 int Engine::choosePitch(int channel, int logicalStep) noexcept {
-    auto pitches = orderedPitches(channel);
-    if (pitches.empty())
+    std::array<int, kMidiNotes> pitches {};
+    const int count = collectOrderedPitches(channel, pitches);
+    if (count <= 0)
         return -1;
 
-    const int count = static_cast<int>(pitches.size());
     const int octaveRange = settings_.octaveRange;
     const int expandedCount = count * octaveRange;
 
@@ -159,25 +162,29 @@ int Engine::choosePitch(int channel, int logicalStep) noexcept {
         }
 
         case Mode::Played: {
-            struct Played {
-                int pitch;
-                std::uint32_t order;
-            };
-            std::vector<Played> played;
-            played.reserve(pitches.size());
-            for (int p : pitches) {
-                const auto& n =
-                    held_[static_cast<std::size_t>(channel)][static_cast<std::size_t>(p)];
-                played.push_back({p, n.order});
+            const int playedIndex = positiveMod(logicalStep, expandedCount);
+            const int rank = playedIndex % count;
+            const int octave = playedIndex / count;
+
+            std::uint32_t previousOrder = 0;
+            int selectedPitch = pitches[0];
+            for (int r = 0; r <= rank; ++r) {
+                std::uint32_t bestOrder = std::numeric_limits<std::uint32_t>::max();
+                int bestPitch = selectedPitch;
+                for (int n = 0; n < count; ++n) {
+                    const int p = pitches[static_cast<std::size_t>(n)];
+                    const auto order =
+                        held_[static_cast<std::size_t>(channel)]
+                             [static_cast<std::size_t>(p)].order;
+                    if (order > previousOrder && order < bestOrder) {
+                        bestOrder = order;
+                        bestPitch = p;
+                    }
+                }
+                selectedPitch = bestPitch;
+                previousOrder = bestOrder;
             }
-            std::stable_sort(played.begin(), played.end(),
-                             [](const Played& a, const Played& b) {
-                                 return a.order < b.order;
-                             });
-            const int expanded = static_cast<int>(played.size()) * octaveRange;
-            const int idx = positiveMod(logicalStep, expanded);
-            return played[static_cast<std::size_t>(idx % played.size())].pitch +
-                   12 * (idx / static_cast<int>(played.size()));
+            return selectedPitch + octave * 12;
         }
 
         case Mode::Random: {
@@ -187,19 +194,22 @@ int Engine::choosePitch(int channel, int logicalStep) noexcept {
         }
     }
 
-    return pitches.front();
+    return pitches[0];
 }
-
-int Engine::constrainPitch(int pitch, const std::vector<int>& chord) const noexcept {
+int Engine::constrainPitch(
+    int pitch,
+    const std::array<int, kMidiNotes>& chord,
+    int chordCount) const noexcept {
     pitch = clampInt(pitch, 0, 127);
 
     if (settings_.scalePolicy == ScalePolicy::Chromatic)
         return pitch;
 
-    if (settings_.scalePolicy == ScalePolicy::ChordOnly && !chord.empty()) {
-        int best = chord.front();
+    if (settings_.scalePolicy == ScalePolicy::ChordOnly && chordCount > 0) {
+        int best = chord[0];
         int bestDistance = std::numeric_limits<int>::max();
-        for (int base : chord) {
+        for (int chordIndex = 0; chordIndex < chordCount; ++chordIndex) {
+            const int base = chord[static_cast<std::size_t>(chordIndex)];
             for (int octave = -8; octave <= 8; ++octave) {
                 const int candidate = base + octave * 12;
                 if (candidate < 0 || candidate > 127)
@@ -302,8 +312,9 @@ void Engine::emitStep(double stepSample,
     if (channel < 0)
         return;
 
-    const auto chord = orderedPitches(channel);
-    if (chord.empty())
+    std::array<int, kMidiNotes> chord {};
+    const int chordCount = collectOrderedPitches(channel, chord);
+    if (chordCount <= 0)
         return;
 
     int pitch = choosePitch(channel, directionIndex_);
@@ -311,11 +322,12 @@ void Engine::emitStep(double stepSample,
         return;
 
     pitch += static_cast<int>(step.octaveOffset) * 12;
-    pitch = constrainPitch(pitch, chord);
+    pitch = constrainPitch(pitch, chord, chordCount);
 
     float sourceVelocity = 1.0f;
     const int basePc = positiveMod(pitch, 12);
-    for (int p : chord) {
+    for (int chordIndex = 0; chordIndex < chordCount; ++chordIndex) {
+        const int p = chord[static_cast<std::size_t>(chordIndex)];
         if (positiveMod(p, 12) == basePc) {
             sourceVelocity = held_[static_cast<std::size_t>(channel)]
                                   [static_cast<std::size_t>(p)].velocity;
@@ -372,13 +384,6 @@ void Engine::process(double sampleRate,
     const double stepDuration =
         samplesPerQuarter / std::max(0.125, settings_.stepsPerQuarter);
 
-    std::vector<MidiInput> events = input;
-    std::stable_sort(events.begin(), events.end(),
-                     [numSamples](const MidiInput& a, const MidiInput& b) {
-                         return clampInt(a.sampleOffset, 0, numSamples - 1) <
-                                clampInt(b.sampleOffset, 0, numSamples - 1);
-                     });
-
     auto emitUntil = [&](double limitSample) {
         stopExpired(blockStart, limitSample, numSamples, output);
 
@@ -393,7 +398,15 @@ void Engine::process(double sampleRate,
                 scheduled += maxDelay * static_cast<double>(settings_.swing);
             }
 
-            if (scheduled >= blockStart && scheduled < limitSample)
+            if (scheduled >= limitSample)
+                break;
+
+            stopExpired(blockStart,
+                        std::min(limitSample, scheduled + 1.0),
+                        numSamples,
+                        output);
+
+            if (scheduled >= blockStart)
                 emitStep(scheduled, stepDuration, blockStart, numSamples, output);
 
             currentStep_ = (currentStep_ + 1) % settings_.patternLength;
@@ -405,8 +418,8 @@ void Engine::process(double sampleRate,
     };
 
     std::size_t i = 0;
-    while (i < events.size()) {
-        const int offset = clampInt(events[i].sampleOffset, 0, numSamples - 1);
+    while (i < input.size()) {
+        const int offset = clampInt(input[i].sampleOffset, 0, numSamples - 1);
         const double eventSample = blockStart + static_cast<double>(offset);
 
         // Render everything strictly before this timestamp using the old note set.
@@ -417,11 +430,11 @@ void Engine::process(double sampleRate,
         bool sawAllNotesOff = false;
 
         std::size_t j = i;
-        for (; j < events.size(); ++j) {
-            if (clampInt(events[j].sampleOffset, 0, numSamples - 1) != offset)
+        for (; j < input.size(); ++j) {
+            if (clampInt(input[j].sampleOffset, 0, numSamples - 1) != offset)
                 break;
 
-            const auto& event = events[j];
+            const auto& event = input[j];
             const int channel = clampInt(event.channel, 0, 15);
             const int pitch = clampInt(event.pitch, 0, 127);
 
@@ -484,14 +497,22 @@ void Engine::process(double sampleRate,
 
     emitUntil(blockEnd);
 
-    std::stable_sort(output.begin(), output.end(),
-                     [](const MidiOutput& a, const MidiOutput& b) {
-                         if (a.sampleOffset != b.sampleOffset)
-                             return a.sampleOffset < b.sampleOffset;
-                         if (a.type == b.type)
-                             return a.noteId < b.noteId;
-                         return a.type == MidiInput::Type::NoteOff;
-                     });
+    const auto before = [](const MidiOutput& a, const MidiOutput& b) {
+        if (a.sampleOffset != b.sampleOffset)
+            return a.sampleOffset < b.sampleOffset;
+        if (a.type != b.type)
+            return a.type == MidiInput::Type::NoteOff;
+        return a.noteId < b.noteId;
+    };
+    for (std::size_t n = 1; n < output.size(); ++n) {
+        MidiOutput key = output[n];
+        std::size_t j = n;
+        while (j > 0 && before(key, output[j - 1])) {
+            output[j] = output[j - 1];
+            --j;
+        }
+        output[j] = key;
+    }
 
     absoluteSample_ = blockEnd;
 }
