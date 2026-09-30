@@ -113,12 +113,18 @@ private:
         int channel {0};
         int pitch {0};
         int noteId {-1};
-        double offSample {0.0};
+    };
+
+    struct ScheduledOutput {
+        bool occupied {false};
+        double absoluteSample {0.0};
+        MidiOutput event {};
     };
 
     Settings settings_ {};
     std::array<std::array<HeldNote, kMidiNotes>, 16> held_ {};
     std::array<ActiveOutput, 64> activeOutputs_ {};
+    std::array<ScheduledOutput, 128> scheduledOutputs_ {};
 
     double absoluteSample_ {0.0};
     double nextStepSample_ {0.0};
@@ -134,10 +140,16 @@ private:
 
     bool anyHeld() const noexcept;
     void clearHeld() noexcept;
+    void cancelScheduled() noexcept;
+    int freeScheduledSlots() const noexcept;
+    bool scheduleOutput(double absoluteSample,
+                        const MidiOutput& event) noexcept;
+    void flushScheduled(double limitSample,
+                        double blockStart,
+                        int blockSize,
+                        std::vector<MidiOutput>& output) noexcept;
     void stopAll(double when, double blockStart, int blockSize,
                  std::vector<MidiOutput>& output) noexcept;
-    void stopExpired(double blockStart, double blockEnd, int blockSize,
-                     std::vector<MidiOutput>& output) noexcept;
 
     int collectOrderedPitches(int channel,
                               std::array<int, kMidiNotes>& out) const noexcept;
