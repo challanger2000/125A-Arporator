@@ -1,5 +1,6 @@
 #include "ArporatorPlugin.h"
 #include "ArporatorIDs.h"
+#include "ArporatorViews.h"
 
 #include "base/source/fstreamer.h"
 #include "pluginterfaces/vst/ivstparameterchanges.h"
@@ -11,6 +12,7 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <cstring>
 #include <string>
 
 namespace arporator::vst3 {
@@ -1044,6 +1046,92 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* state) {
     }
 
     return kResultOk;
+}
+
+
+tresult PLUGIN_API Controller::setState(IBStream* state) {
+    if (!state)
+        return kInvalidArgument;
+    IBStreamer stream(state, kLittleEndian);
+    double zoom = 1.0;
+    int32 selected = 0;
+    if (!stream.readDouble(zoom))
+        return kResultOk;
+    if (!stream.readInt32(selected))
+        selected = 0;
+    guiZoom_ = zoom >= 1.25 ? 1.5 : 1.0;
+    selectedStep_ = std::clamp<int32>(selected, 0, kStepParamCount - 1);
+    if (editor_)
+        editor_->setZoomFactor(guiZoom_);
+    return kResultOk;
+}
+
+tresult PLUGIN_API Controller::getState(IBStream* state) {
+    if (!state)
+        return kInvalidArgument;
+    IBStreamer stream(state, kLittleEndian);
+    return stream.writeDouble(guiZoom_) &&
+           stream.writeInt32(static_cast<int32>(selectedStep_))
+        ? kResultOk : kResultFalse;
+}
+
+IPlugView* PLUGIN_API Controller::createView(FIDString name) {
+    if (!name || std::strcmp(name, ViewType::kEditor) != 0)
+        return nullptr;
+    auto* editor = new VSTGUI::VST3Editor(this, "view", "Arporator.uidesc");
+    gui::configureEditor(editor, 1180.0, 680.0, guiZoom_);
+    editor_ = editor;
+    return editor;
+}
+
+VSTGUI::CView* Controller::createCustomView(
+    VSTGUI::UTF8StringPtr name,
+    const VSTGUI::UIAttributes& attributes,
+    const VSTGUI::IUIDescription*,
+    VSTGUI::VST3Editor* editor) {
+    editor_ = editor;
+    return gui::createCustomView(name, attributes, editor, this);
+}
+
+VSTGUI::CView* Controller::verifyView(
+    VSTGUI::CView* view,
+    const VSTGUI::UIAttributes&,
+    const VSTGUI::IUIDescription*,
+    VSTGUI::VST3Editor* editor) {
+    editor_ = editor;
+    return view;
+}
+
+void Controller::valueChanged(VSTGUI::CControl* control) {
+    if (!control)
+        return;
+    const auto tag = static_cast<ParamID>(control->getTag());
+    editParameter(tag, control->getValueNormalized());
+}
+
+void Controller::willClose(VSTGUI::VST3Editor* editor) {
+    if (editor_ == editor)
+        editor_ = nullptr;
+}
+
+void Controller::setGuiZoom(double zoom) {
+    guiZoom_ = zoom >= 1.25 ? 1.5 : 1.0;
+    if (editor_ && std::abs(editor_->getZoomFactor() - guiZoom_) > 1.0e-9)
+        editor_->setZoomFactor(guiZoom_);
+}
+
+void Controller::setSelectedStep(int step) noexcept {
+    selectedStep_ = std::clamp(step, 0, static_cast<int>(kStepParamCount - 1));
+    if (editor_ && editor_->getFrame())
+        editor_->getFrame()->invalid();
+}
+
+void Controller::editParameter(ParamID id, double normalized) {
+    normalized = std::clamp(normalized, 0.0, 1.0);
+    setParamNormalized(id, normalized);
+    beginEdit(id);
+    performEdit(id, normalized);
+    endEdit(id);
 }
 
 } // namespace arporator::vst3
