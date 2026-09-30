@@ -92,6 +92,7 @@ void Engine::reset() noexcept {
         out = {};
     absoluteSample_ = 0.0;
     nextStepSample_ = 0.0;
+    lastStepDuration_ = 0.0;
     currentStep_ = 0;
     directionIndex_ = 0;
     directionSign_ = 1;
@@ -565,6 +566,22 @@ void Engine::process(double sampleRate,
     const double samplesPerQuarter = sampleRate * 60.0 / tempo;
     const double stepDuration =
         samplesPerQuarter / std::max(0.125, settings_.stepsPerQuarter);
+
+    // Preserve the fractional phase of the currently pending step when host
+    // tempo or Rate changes between process blocks. Without this correction,
+    // the next step would still arrive on the old grid and only subsequent
+    // steps would follow the new tempo.
+    if (running_ &&
+        lastStepDuration_ > 0.0 &&
+        std::abs(stepDuration - lastStepDuration_) > 1.0e-9 &&
+        nextStepSample_ > blockStart) {
+        const double remaining = nextStepSample_ - blockStart;
+        const double phaseRemaining =
+            std::clamp(remaining / lastStepDuration_, 0.0, 1.0);
+        nextStepSample_ =
+            blockStart + phaseRemaining * stepDuration;
+    }
+    lastStepDuration_ = stepDuration;
 
     auto emitUntil = [&](double limitSample) {
         stopExpired(blockStart, limitSample, numSamples, output);
