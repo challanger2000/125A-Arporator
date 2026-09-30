@@ -1,0 +1,17 @@
+#pragma once
+
+#include <cstddef>
+
+namespace arporator::vst3::gui::branding {
+
+struct MasterPathSource {
+    const char* d;
+    bool red;
+};
+
+inline constexpr MasterPathSource kMasterPaths[] = {
+@ARPORATOR_BRANDING_PATHS@};
+
+inline constexpr std::size_t kMasterPathCount = @ARPORATOR_BRANDING_PATH_COUNT@;
+
+} // namespace arporator::vst3::gui::branding
