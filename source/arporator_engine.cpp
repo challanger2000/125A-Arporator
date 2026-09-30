@@ -372,11 +372,11 @@ void Engine::emitStep(double stepSample,
     // starts and avoids look-ahead/negative-time scheduling in a MIDI effect.
     // Combined feel delay is capped below half a step so note ordering remains
     // stable even at extreme settings.
-    static constexpr float grooveDelay[8] {
-        0.00f, 0.12f, 0.03f, 0.16f, 0.00f, 0.10f, 0.02f, 0.14f
+    static constexpr double grooveDelay[8] {
+        0.00, 0.12, 0.03, 0.16, 0.00, 0.10, 0.02, 0.14
     };
-    static constexpr float grooveAccent[8] {
-        1.05f, 0.97f, 1.02f, 0.95f, 1.04f, 0.98f, 1.01f, 0.96f
+    static constexpr double grooveAccent[8] {
+        1.05, 0.97, 1.02, 0.95, 1.04, 0.98, 1.01, 0.96
     };
 
     const int phraseStep = directionIndex_;
@@ -418,7 +418,9 @@ void Engine::emitStep(double stepSample,
 
     const float grooveVelocity =
         1.0f +
-        (grooveAccent[grooveIndex] - 1.0f) * settings_.groove;
+        static_cast<float>(
+            (grooveAccent[grooveIndex] - 1.0) *
+            static_cast<double>(settings_.groove));
 
     const float finalVelocity = clamp01(
         sourceVelocity * step.velocity * humanVelocity * grooveVelocity);
