@@ -3,6 +3,7 @@
 #include "vstgui/lib/cview.h"
 #include "vstgui/lib/controls/ccontrol.h"
 #include "vstgui/lib/controls/cknob.h"
+#include "vstgui/lib/controls/coptionmenu.h"
 #include "vstgui/plugin-bindings/vst3editor.h"
 #include "vstgui/uidescription/uiattributes.h"
 
@@ -39,20 +40,17 @@ public:
         const VSTGUI::CButtonState& buttons) override;
 };
 
-class SelectorView final : public VSTGUI::CControl {
+class PopupSelectorView final : public VSTGUI::COptionMenu {
 public:
-    SelectorView(const VSTGUI::CRect& size,
-                 VSTGUI::IControlListener* listener,
-                 std::int32_t tag,
-                 std::vector<std::string> labels);
-    SelectorView(const SelectorView& other);
-    VSTGUI::CBaseObject* newCopy() const override { return new SelectorView(*this); }
-    void draw(VSTGUI::CDrawContext* context) override;
+    PopupSelectorView(const VSTGUI::CRect& size,
+                      VSTGUI::IControlListener* listener,
+                      std::int32_t tag,
+                      const std::vector<std::string>& labels);
+    PopupSelectorView(const PopupSelectorView& other);
+    VSTGUI::CBaseObject* newCopy() const override { return new PopupSelectorView(*this); }
     VSTGUI::CMouseEventResult onMouseDown(
         VSTGUI::CPoint& where,
         const VSTGUI::CButtonState& buttons) override;
-private:
-    std::vector<std::string> labels_;
 };
 
 class ToggleView final : public VSTGUI::CControl {
