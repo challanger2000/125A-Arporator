@@ -27,7 +27,7 @@ enum class ScalePolicy : std::uint8_t {
 struct Step {
     bool enabled {true};
     float velocity {1.0f};      // 0..1 multiplier
-    float gate {0.75f};         // 0.01..1 of sub-step duration
+    float gate {1.0f};          // 0.01..1 per-step multiplier
     std::uint8_t ratchet {1};   // 1..4
     float probability {1.0f};   // 0..1
     std::int8_t octaveOffset {0};
