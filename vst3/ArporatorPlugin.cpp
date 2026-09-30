@@ -75,6 +75,9 @@ bool writeRuntimeState(IBStream* state, const RuntimeState& runtime) noexcept {
         !s.writeInt32(runtime.settings.patternLength) ||
         !s.writeDouble(runtime.settings.globalGate) ||
         !s.writeDouble(runtime.settings.swing) ||
+        !s.writeDouble(runtime.settings.humanize) ||
+        !s.writeDouble(runtime.settings.groove) ||
+        !s.writeDouble(runtime.settings.strum) ||
         !s.writeInt32(runtime.settings.restartOnTrigger ? 1 : 0) ||
         !s.writeInt32(static_cast<int32>(runtime.settings.scalePolicy)) ||
         !s.writeInt32(runtime.settings.keyRoot) ||
@@ -114,16 +117,30 @@ bool readRuntimeState(IBStream* state, RuntimeState& runtime) noexcept {
 
     double globalGate = 1.0;
     double swing = 0.0;
+    double humanize = 0.0;
+    double groove = 0.0;
+    double strum = 0.0;
 
     if (!s.readInt32(magic) || magic != kStateMagic ||
-        !s.readInt32(version) || version != kStateVersion ||
+        !s.readInt32(version) || version < 1 || version > kStateVersion ||
         !s.readInt32(mode) ||
         !s.readInt32(runtime.rateIndex) ||
         !s.readInt32(octaveRange) ||
         !s.readInt32(patternLength) ||
         !s.readDouble(globalGate) ||
-        !s.readDouble(swing) ||
-        !s.readInt32(restart) ||
+        !s.readDouble(swing)) {
+        return false;
+    }
+
+    if (version >= 2) {
+        if (!s.readDouble(humanize) ||
+            !s.readDouble(groove) ||
+            !s.readDouble(strum)) {
+            return false;
+        }
+    }
+
+    if (!s.readInt32(restart) ||
         !s.readInt32(scalePolicy) ||
         !s.readInt32(keyRoot) ||
         !s.readInt32(runtime.scaleMode) ||
@@ -142,6 +159,12 @@ bool readRuntimeState(IBStream* state, RuntimeState& runtime) noexcept {
         static_cast<float>(std::clamp(globalGate, 0.01, 1.0));
     clean.settings.swing =
         static_cast<float>(std::clamp(swing, 0.0, 1.0));
+    clean.settings.humanize =
+        static_cast<float>(std::clamp(humanize, 0.0, 1.0));
+    clean.settings.groove =
+        static_cast<float>(std::clamp(groove, 0.0, 1.0));
+    clean.settings.strum =
+        static_cast<float>(std::clamp(strum, 0.0, 1.0));
     clean.settings.restartOnTrigger = restart != 0;
     clean.settings.scalePolicy =
         static_cast<ScalePolicy>(std::clamp(scalePolicy, 0, 2));
@@ -341,6 +364,12 @@ void Processor::applyNormalizedParameter(ParamID id, double value) noexcept {
     } else if (id == kScaleModeId) {
         state_.scaleMode = normIndex(value, kScaleModeCount - 1);
         state_.settings.scaleMask = scaleMaskForMode(state_.scaleMode);
+    } else if (id == kHumanizeId) {
+        state_.settings.humanize = static_cast<float>(value);
+    } else if (id == kGrooveId) {
+        state_.settings.groove = static_cast<float>(value);
+    } else if (id == kStrumId) {
+        state_.settings.strum = static_cast<float>(value);
     } else if (id >= kStepEnableBase &&
                id < kStepEnableBase + kStepParamCount) {
         const auto index = static_cast<std::size_t>(id - kStepEnableBase);
@@ -651,6 +680,18 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
     scale->appendString(STR16("MINOR"));
     parameters.addParameter(scale);
 
+    parameters.addParameter(new RangeParameter(
+        STR16("Humanize"), kHumanizeId, STR16("%"),
+        0.0, 100.0, 0.0, 0));
+
+    parameters.addParameter(new RangeParameter(
+        STR16("Groove"), kGrooveId, STR16("%"),
+        0.0, 100.0, 0.0, 0));
+
+    parameters.addParameter(new RangeParameter(
+        STR16("Strum"), kStrumId, STR16("%"),
+        0.0, 100.0, 0.0, 0));
+
     for (int i = 0; i < kStepParamCount; ++i) {
         auto enableTitle = makeStepTitle(i, u"On");
         parameters.addParameter(new RangeParameter(
@@ -728,6 +769,9 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* state) {
     setNorm(kScaleModeId,
             static_cast<double>(runtime.scaleMode) /
             static_cast<double>(kScaleModeCount - 1));
+    setNorm(kHumanizeId, runtime.settings.humanize);
+    setNorm(kGrooveId, runtime.settings.groove);
+    setNorm(kStrumId, runtime.settings.strum);
 
     for (int i = 0; i < kStepParamCount; ++i) {
         const auto& step =
