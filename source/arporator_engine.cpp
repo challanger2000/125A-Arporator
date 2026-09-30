@@ -418,7 +418,7 @@ void Engine::emitStep(double stepSample,
     // EVOLVE is non-destructive: derive a temporary effective step from the
     // stored base step. Phase 0 leaves the first four full pattern cycles
     // untouched; later phases change only unlocked dimensions.
-    const std::uint64_t evolvePhase = patternCycle_ / 4u;
+    const std::uint64_t evolvePhase = patternCycle_ / 2u;
     if (settings_.evolve > 0.0f &&
         evolvePhase > 0u &&
         !baseStep.locked) {
@@ -486,7 +486,7 @@ void Engine::emitStep(double stepSample,
         if (!settings_.evolveLocks.velocity) {
             step.velocity = std::clamp(
                 baseStep.velocity +
-                    bipolarFromHash(h1) * 0.12f * settings_.evolve,
+                    bipolarFromHash(h1) * 0.16f * settings_.evolve,
                 0.10f,
                 1.0f);
         }
@@ -494,7 +494,7 @@ void Engine::emitStep(double stepSample,
         if (!settings_.evolveLocks.gate) {
             step.gate = std::clamp(
                 baseStep.gate +
-                    bipolarFromHash(h2) * 0.14f * settings_.evolve,
+                    bipolarFromHash(h2) * 0.18f * settings_.evolve,
                 0.10f,
                 1.0f);
         }
@@ -610,7 +610,7 @@ void Engine::emitStep(double stepSample,
               static_cast<double>(chordCount - 1)
             : 0.0;
     const double strumDelaySamples =
-        stepDuration * 0.12 *
+        stepDuration * 0.20 *
         static_cast<double>(settings_.strum) *
         strumRank;
 
