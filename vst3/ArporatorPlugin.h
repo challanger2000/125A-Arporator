@@ -128,6 +128,8 @@ private:
 
     double guiZoom_ {1.2};
     int selectedStep_ {0};
+    bool variationBasePreviewValid_ {false};
+    std::array<Step, kMaxSteps> variationBasePreviewSteps_ {};
     VSTGUI::VST3Editor* editor_ {nullptr};
 };
 
