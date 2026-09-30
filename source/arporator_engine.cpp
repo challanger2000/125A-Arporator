@@ -24,6 +24,31 @@ int positiveMod(int value, int mod) noexcept {
     return r < 0 ? r + mod : r;
 }
 
+std::uint32_t feelHash(std::uint32_t seed,
+                       int step,
+                       int pitch,
+                       std::uint32_t salt) noexcept {
+    std::uint32_t x = seed ^
+        (static_cast<std::uint32_t>(step) * 0x9E3779B9u) ^
+        (static_cast<std::uint32_t>(pitch + 1) * 0x85EBCA6Bu) ^
+        salt;
+    x ^= x >> 16;
+    x *= 0x7FEB352Du;
+    x ^= x >> 15;
+    x *= 0x846CA68Bu;
+    x ^= x >> 16;
+    return x;
+}
+
+float unitFromHash(std::uint32_t h) noexcept {
+    return static_cast<float>(h & 0x00FFFFFFu) /
+           static_cast<float>(0x01000000u);
+}
+
+float bipolarFromHash(std::uint32_t h) noexcept {
+    return unitFromHash(h) * 2.0f - 1.0f;
+}
+
 } // namespace
 
 Engine::Engine() {
@@ -41,6 +66,9 @@ void Engine::setSettings(const Settings& settings) noexcept {
             ? std::clamp(settings_.stepsPerQuarter, 0.125, 32.0)
             : 4.0;
     settings_.swing = clamp01(settings_.swing);
+    settings_.humanize = clamp01(settings_.humanize);
+    settings_.groove = clamp01(settings_.groove);
+    settings_.strum = clamp01(settings_.strum);
     settings_.globalGate = std::clamp(settings_.globalGate, 0.01f, 1.0f);
     settings_.keyRoot = positiveMod(settings_.keyRoot, 12);
     for (auto& step : settings_.steps) {
@@ -329,14 +357,71 @@ void Engine::emitStep(double stepSample,
 
     float sourceVelocity = 1.0f;
     const int basePc = positiveMod(pitch, 12);
+    int chordRank = 0;
     for (int chordIndex = 0; chordIndex < chordCount; ++chordIndex) {
         const int p = chord[static_cast<std::size_t>(chordIndex)];
         if (positiveMod(p, 12) == basePc) {
             sourceVelocity = held_[static_cast<std::size_t>(channel)]
                                   [static_cast<std::size_t>(p)].velocity;
+            chordRank = chordIndex;
             break;
         }
     }
+
+    // Musical feel is intentionally delay-only. This preserves exact trigger
+    // starts and avoids look-ahead/negative-time scheduling in a MIDI effect.
+    // Combined feel delay is capped below half a step so note ordering remains
+    // stable even at extreme settings.
+    static constexpr float grooveDelay[8] {
+        0.00f, 0.12f, 0.03f, 0.16f, 0.00f, 0.10f, 0.02f, 0.14f
+    };
+    static constexpr float grooveAccent[8] {
+        1.05f, 0.97f, 1.02f, 0.95f, 1.04f, 0.98f, 1.01f, 0.96f
+    };
+
+    const int phraseStep = directionIndex_;
+    const int grooveIndex = positiveMod(phraseStep, 8);
+    const double grooveDelaySamples =
+        stepDuration * static_cast<double>(grooveDelay[grooveIndex]) *
+        static_cast<double>(settings_.groove);
+
+    const float downbeatTightness =
+        (positiveMod(phraseStep, 4) == 0) ? 0.25f : 1.0f;
+    const float humanTimingUnit =
+        unitFromHash(feelHash(settings_.randomSeed, phraseStep, pitch, 0x484D4E54u));
+    const double humanDelaySamples =
+        stepDuration * 0.06 *
+        static_cast<double>(settings_.humanize) *
+        static_cast<double>(downbeatTightness) *
+        static_cast<double>(humanTimingUnit);
+
+    const double strumRank =
+        chordCount > 1
+            ? static_cast<double>(chordRank) /
+              static_cast<double>(chordCount - 1)
+            : 0.0;
+    const double strumDelaySamples =
+        stepDuration * 0.12 *
+        static_cast<double>(settings_.strum) *
+        strumRank;
+
+    const double feelDelay = std::min(
+        stepDuration * 0.45,
+        grooveDelaySamples + humanDelaySamples + strumDelaySamples);
+    const double feltStepSample = stepSample + feelDelay;
+
+    const float humanVelocity =
+        1.0f +
+        bipolarFromHash(
+            feelHash(settings_.randomSeed, phraseStep, pitch, 0x56454C4Fu)) *
+        0.12f * settings_.humanize;
+
+    const float grooveVelocity =
+        1.0f +
+        (grooveAccent[grooveIndex] - 1.0f) * settings_.groove;
+
+    const float finalVelocity = clamp01(
+        sourceVelocity * step.velocity * humanVelocity * grooveVelocity);
 
     const int ratchet = clampInt(step.ratchet, 1, 4);
     const double subDuration = stepDuration / static_cast<double>(ratchet);
@@ -346,7 +431,8 @@ void Engine::emitStep(double stepSample,
                  static_cast<double>(settings_.globalGate));
 
     for (int hit = 0; hit < ratchet; ++hit) {
-        const double onSample = stepSample + subDuration * static_cast<double>(hit);
+        const double onSample =
+            feltStepSample + subDuration * static_cast<double>(hit);
         const int offset = clampInt(
             static_cast<int>(std::floor(onSample - blockStart + 1.0e-9)),
             0, std::max(0, blockSize - 1));
@@ -357,7 +443,7 @@ void Engine::emitStep(double stepSample,
             offset,
             channel,
             pitch,
-            clamp01(sourceVelocity * step.velocity),
+            finalVelocity,
             noteId
         });
 
