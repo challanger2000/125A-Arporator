@@ -394,7 +394,7 @@ void StepGridView::draw(VSTGUI::CDrawContext* c) {
             c->setFontColor(ratchet>1
                 ? VSTGUI::CColor{185,213,235,255}
                 : VSTGUI::CColor{137,143,151,210});
-            c->drawString(rt,{cell.left+4,cell.top+18,cell.right-4,cell.top+31},VSTGUI::kLeftText);
+            c->drawString(rt,{cell.left+4,cell.top+17,cell.right-4,cell.top+29},VSTGUI::kCenterText);
         }
         {
             // Probability is always visible so the neutral P100 state can be
@@ -404,7 +404,7 @@ void StepGridView::draw(VSTGUI::CDrawContext* c) {
             c->setFontColor(probability<0.999
                 ? kAmber
                 : VSTGUI::CColor{137,143,151,210});
-            c->drawString(pr,{cell.left+4,cell.top+18,cell.right-4,cell.top+31},VSTGUI::kRightText);
+            c->drawString(pr,{cell.left+4,cell.top+30,cell.right-4,cell.top+42},VSTGUI::kCenterText);
         }
     }
     setDirty(false);
@@ -692,11 +692,9 @@ VSTGUI::CMouseEventResult StepGridView::onMouseUp(
             // compact detail menu: Note, Ratchet, Probability, Octave, Lock,
             // and Reset Step.
             showStepMenu(dragStep_,where);
-        } else if (localY>=16.0 && localY<=34.0 &&
-                   localX<cellW*0.50) {
+        } else if (localY>=16.0 && localY<30.0) {
             showRatchetMenu(dragStep_,where);
-        } else if (localY>=16.0 && localY<=34.0 &&
-                   localX>=cellW*0.50) {
+        } else if (localY>=30.0 && localY<=44.0) {
             showProbabilityMenu(dragStep_,where);
         } else {
             const auto id=static_cast<Steinberg::Vst::ParamID>(
