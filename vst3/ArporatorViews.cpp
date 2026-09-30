@@ -402,13 +402,8 @@ VSTGUI::CMouseEventResult StepGridView::onMouseDown(
     const int step=row*16+col;
     controller_->setSelectedStep(step);
 
-    const int length=1+static_cast<int>(std::lround(
-        controller_->getParamNormalized(kPatternLengthId)*31.0));
-    if (step<length) {
-        const auto id=static_cast<Steinberg::Vst::ParamID>(kStepEnableBase+step);
-        const double now=controller_->getParamNormalized(id);
-        controller_->editParameter(id,now>=0.5?0.0:1.0);
-    }
+    // Selection is deliberately non-destructive. ON/OFF is edited only in the
+    // selected-step panel so browsing steps never changes MIDI output.
     invalid();
     return VSTGUI::kMouseDownEventHandledButDontNeedMovedOrUpEvents;
 }
@@ -447,6 +442,7 @@ void SelectedStepView::draw(VSTGUI::CDrawContext* c) {
 
     const double gap = 8.0;
     const double widths[8] = {64,82,104,104,82,112,82,72};
+    const double controlTop = r.top + 22.0;
     double x = r.left;
 
     const auto drawCell = [&](double w,
@@ -455,7 +451,7 @@ void SelectedStepView::draw(VSTGUI::CDrawContext* c) {
                               double level,
                               bool active,
                               bool levelBar) {
-        VSTGUI::CRect cell{x,r.top,x+w,r.bottom};
+        VSTGUI::CRect cell{x,controlTop,x+w,r.bottom};
         c->setFillColor(active ? VSTGUI::CColor{27,49,66,255} : kPanel2);
         c->setFrameColor(active ? VSTGUI::CColor{105,175,228,230} : kBorder);
         c->setLineWidth(active ? 1.5 : 1.0);
@@ -491,7 +487,7 @@ void SelectedStepView::draw(VSTGUI::CDrawContext* c) {
     c->setFont(VSTGUI::kNormalFont,10.0,VSTGUI::kBoldFace);
     c->setFontColor(kAccent);
     c->drawString(stepLabel,
-                  {r.left,r.top-23,r.left+120,r.top-5},
+                  {r.left,r.top+1,r.left+120,r.top+18},
                   VSTGUI::kLeftText);
 
     drawCell(widths[0],"ON",on>=0.5 ? "ON" : "OFF",on,on>=0.5,false);
@@ -678,7 +674,10 @@ VSTGUI::CView* createCustomView(VSTGUI::UTF8StringPtr name,
     if(std::strcmp(name,"ArpTrigger")==0) return new SelectorView(rect,editor,tag,{"RESTART","CONTINUE"});
     if(std::strcmp(name,"ArpPolicy")==0) return new SelectorView(rect,editor,tag,{"CHORD","SCALE","CHROM"});
     if(std::strcmp(name,"ArpKey")==0) return new SelectorView(rect,editor,tag,{"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"});
-    if(std::strcmp(name,"ArpScale")==0) return new SelectorView(rect,editor,tag,{"MAJOR","MINOR"});
+    if(std::strcmp(name,"ArpScale")==0) return new SelectorView(
+        rect,editor,tag,
+        {"MAJOR","MINOR","DORIAN","PHRYGIAN","LYDIAN",
+         "MIXOLYD","HARM MIN","MAJ PENT","MIN PENT","BLUES"});
     if(std::strcmp(name,"ArpLock")==0) return new ToggleView(rect,editor,tag,"OPEN","LOCK");
 
     return nullptr;
