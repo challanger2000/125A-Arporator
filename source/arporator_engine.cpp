@@ -375,9 +375,8 @@ void Engine::process(double sampleRate,
     std::vector<MidiInput> events = input;
     std::stable_sort(events.begin(), events.end(),
                      [numSamples](const MidiInput& a, const MidiInput& b) {
-                         const int ao = clampInt(a.sampleOffset, 0, numSamples - 1);
-                         const int bo = clampInt(b.sampleOffset, 0, numSamples - 1);
-                         return ao < bo;
+                         return clampInt(a.sampleOffset, 0, numSamples - 1) <
+                                clampInt(b.sampleOffset, 0, numSamples - 1);
                      });
 
     auto emitUntil = [&](double limitSample) {
@@ -405,64 +404,82 @@ void Engine::process(double sampleRate,
         stopExpired(blockStart, limitSample, numSamples, output);
     };
 
-    for (const auto& event : events) {
-        const int offset = clampInt(event.sampleOffset, 0, numSamples - 1);
+    std::size_t i = 0;
+    while (i < events.size()) {
+        const int offset = clampInt(events[i].sampleOffset, 0, numSamples - 1);
         const double eventSample = blockStart + static_cast<double>(offset);
 
-        // First render everything that is due strictly before this input event.
+        // Render everything strictly before this timestamp using the old note set.
         emitUntil(eventSample);
 
-        const int channel = clampInt(event.channel, 0, 15);
-        const int pitch = clampInt(event.pitch, 0, 127);
+        const bool hadHeldBeforeGroup = anyHeld();
+        bool sawNoteOn = false;
+        bool sawAllNotesOff = false;
 
-        if (event.type == MidiInput::Type::AllNotesOff) {
-            clearHeld();
+        std::size_t j = i;
+        for (; j < events.size(); ++j) {
+            if (clampInt(events[j].sampleOffset, 0, numSamples - 1) != offset)
+                break;
+
+            const auto& event = events[j];
+            const int channel = clampInt(event.channel, 0, 15);
+            const int pitch = clampInt(event.pitch, 0, 127);
+
+            if (event.type == MidiInput::Type::AllNotesOff) {
+                clearHeld();
+                sawAllNotesOff = true;
+                continue;
+            }
+
+            if (event.type == MidiInput::Type::NoteOn && event.velocity > 0.0f) {
+                sawNoteOn = true;
+                auto& note = held_[static_cast<std::size_t>(channel)]
+                                   [static_cast<std::size_t>(pitch)];
+                if (note.count == 0)
+                    note.order = ++orderCounter_;
+                if (note.count < std::numeric_limits<std::uint16_t>::max())
+                    ++note.count;
+                note.velocity = clamp01(event.velocity);
+                continue;
+            }
+
+            if (event.type == MidiInput::Type::NoteOff ||
+                (event.type == MidiInput::Type::NoteOn && event.velocity <= 0.0f)) {
+                auto& note = held_[static_cast<std::size_t>(channel)]
+                                   [static_cast<std::size_t>(pitch)];
+                if (note.count > 0)
+                    --note.count;
+            }
+        }
+
+        if (sawAllNotesOff) {
             stopAll(eventSample, blockStart, numSamples, output);
             running_ = false;
             currentStep_ = 0;
             directionIndex_ = 0;
-            continue;
-        }
-
-        if (event.type == MidiInput::Type::NoteOn && event.velocity > 0.0f) {
-            const bool wasEmpty = !anyHeld();
-            auto& note = held_[static_cast<std::size_t>(channel)]
-                               [static_cast<std::size_t>(pitch)];
-            if (note.count == 0)
-                note.order = ++orderCounter_;
-            if (note.count < std::numeric_limits<std::uint16_t>::max())
-                ++note.count;
-            note.velocity = clamp01(event.velocity);
-
-            if (wasEmpty || settings_.restartOnTrigger) {
-                stopAll(eventSample, blockStart, numSamples, output);
-                running_ = true;
-                currentStep_ = 0;
-                directionIndex_ = 0;
-                directionSign_ = 1;
-                nextStepSample_ = eventSample;
-            } else if (!running_) {
-                running_ = true;
-                nextStepSample_ = eventSample;
-            }
-
-            // A trigger starts immediately at its exact sample. Rendering to
-            // eventSample + 1 sample includes that first step but no later one.
+        } else if (!anyHeld()) {
+            stopAll(eventSample, blockStart, numSamples, output);
+            running_ = false;
+            currentStep_ = 0;
+            directionIndex_ = 0;
+        } else if (sawNoteOn &&
+                   (!hadHeldBeforeGroup || settings_.restartOnTrigger)) {
+            // All note-ons sharing this exact timestamp form one trigger.
+            // Capture the whole chord first, then restart once at Step 1.
+            stopAll(eventSample, blockStart, numSamples, output);
+            running_ = true;
+            currentStep_ = 0;
+            directionIndex_ = 0;
+            directionSign_ = 1;
+            nextStepSample_ = eventSample;
             emitUntil(std::min(blockEnd, eventSample + 1.0));
-        } else if (event.type == MidiInput::Type::NoteOff ||
-                   (event.type == MidiInput::Type::NoteOn && event.velocity <= 0.0f)) {
-            auto& note = held_[static_cast<std::size_t>(channel)]
-                               [static_cast<std::size_t>(pitch)];
-            if (note.count > 0)
-                --note.count;
-
-            if (!anyHeld()) {
-                stopAll(eventSample, blockStart, numSamples, output);
-                running_ = false;
-                currentStep_ = 0;
-                directionIndex_ = 0;
-            }
+        } else if (!running_ && anyHeld()) {
+            running_ = true;
+            nextStepSample_ = eventSample;
+            emitUntil(std::min(blockEnd, eventSample + 1.0));
         }
+
+        i = j;
     }
 
     emitUntil(blockEnd);
