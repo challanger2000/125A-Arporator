@@ -119,9 +119,12 @@ private:
     void stopExpired(double blockStart, double blockEnd, int blockSize,
                      std::vector<MidiOutput>& output) noexcept;
 
-    std::vector<int> orderedPitches(int channel) const;
+    int collectOrderedPitches(int channel,
+                              std::array<int, kMidiNotes>& out) const noexcept;
     int choosePitch(int channel, int logicalStep) noexcept;
-    int constrainPitch(int pitch, const std::vector<int>& chord) const noexcept;
+    int constrainPitch(int pitch,
+                       const std::array<int, kMidiNotes>& chord,
+                       int chordCount) const noexcept;
     bool stepPassesProbability(int step) noexcept;
     std::uint32_t nextRandom() noexcept;
 
