@@ -7,6 +7,7 @@
 
 #include "AtomicSnapshot.h"
 #include "../source/arporator_engine.h"
+#include "../source/variation.h"
 
 #include <atomic>
 #include <cstdint>
@@ -18,6 +19,9 @@ struct RuntimeState {
     Settings settings {};
     Steinberg::int32 rateIndex {2};   // 1/16
     Steinberg::int32 scaleMode {0};   // Major
+    float variationAmount {0.35f};
+    VariationLocks variationLocks {};
+    std::uint32_t variationCounter {0u};
 };
 
 class Processor final : public Steinberg::Vst::AudioEffect {
@@ -67,6 +71,7 @@ private:
 
     double sampleRate_ {48000.0};
     bool settingsDirty_ {true};
+    double variateTrigger_ {0.0};
     bool hadTransportState_ {false};
     bool wasPlaying_ {false};
 };
