@@ -32,6 +32,7 @@ Engine::Engine() {
 }
 
 void Engine::setSettings(const Settings& settings) noexcept {
+    const std::uint32_t previousSeed = settings_.randomSeed;
     settings_ = settings;
     settings_.patternLength = clampInt(settings_.patternLength, 1, kMaxSteps);
     settings_.octaveRange = clampInt(settings_.octaveRange, 1, 4);
@@ -40,6 +41,7 @@ void Engine::setSettings(const Settings& settings) noexcept {
             ? std::clamp(settings_.stepsPerQuarter, 0.125, 32.0)
             : 4.0;
     settings_.swing = clamp01(settings_.swing);
+    settings_.globalGate = std::clamp(settings_.globalGate, 0.01f, 1.0f);
     settings_.keyRoot = positiveMod(settings_.keyRoot, 12);
     for (auto& step : settings_.steps) {
         step.velocity = clamp01(step.velocity);
@@ -49,7 +51,8 @@ void Engine::setSettings(const Settings& settings) noexcept {
         step.octaveOffset =
             static_cast<std::int8_t>(clampInt(step.octaveOffset, -4, 4));
     }
-    rng_ = settings_.randomSeed ? settings_.randomSeed : 0x125A0001u;
+    if (settings_.randomSeed != previousSeed)
+        rng_ = settings_.randomSeed ? settings_.randomSeed : 0x125A0001u;
 }
 
 void Engine::reset() noexcept {
@@ -338,7 +341,9 @@ void Engine::emitStep(double stepSample,
     const int ratchet = clampInt(step.ratchet, 1, 4);
     const double subDuration = stepDuration / static_cast<double>(ratchet);
     const double gateDuration =
-        std::max(1.0, subDuration * static_cast<double>(step.gate));
+        std::max(1.0,
+                 subDuration * static_cast<double>(step.gate) *
+                 static_cast<double>(settings_.globalGate));
 
     for (int hit = 0; hit < ratchet; ++hit) {
         const double onSample = stepSample + subDuration * static_cast<double>(hit);
