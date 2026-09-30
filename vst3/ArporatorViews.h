@@ -103,6 +103,8 @@ public:
 private:
     int stepAt(const VSTGUI::CPoint& where) const noexcept;
     void showStepMenu(int step, const VSTGUI::CPoint& where);
+    void showRatchetMenu(int step, const VSTGUI::CPoint& where);
+    void showProbabilityMenu(int step, const VSTGUI::CPoint& where);
     Controller* controller_ {nullptr};
     int dragStep_ {-1};
     VSTGUI::CPoint dragStart_ {};
