@@ -1,0 +1,50 @@
+name: Arporator VST3 CI
+
+on:
+  push:
+    branches:
+      - v0.1.0-development
+    paths:
+      - "CMakeLists.txt"
+      - "vst3/**"
+      - ".github/workflows/vst3-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: arporator-vst3-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-vst3:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -DARPORATOR_BUILD_VST3=ON
+
+      - name: Build VST3
+        run: cmake --build build --config Release --target Arporator --parallel
+
+      - name: Run core tests
+        run: ctest --test-dir build -C Release --output-on-failure
+
+      - name: Stage VST3
+        shell: pwsh
+        run: |
+          $plugin = Get-ChildItem -Path build -Recurse -Directory -Filter "*.vst3" |
+            Where-Object { $_.Name -match "Arporator" } |
+            Select-Object -First 1
+          if (-not $plugin) {
+            throw "Arporator VST3 bundle not found."
+          }
+          New-Item -ItemType Directory -Force -Path artifact | Out-Null
+          Copy-Item -Recurse -Force $plugin.FullName artifact\
+
+      - name: Upload VST3
+        uses: actions/upload-artifact@v4
+        with:
+          name: 125A-Arporator-v0.1.0-Windows-x64-VST3
+          path: artifact/**
+          if-no-files-found: error
