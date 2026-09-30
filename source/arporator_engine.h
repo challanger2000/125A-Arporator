@@ -40,6 +40,9 @@ struct Settings {
     int octaveRange {1};        // 1..4
     double stepsPerQuarter {4.0}; // 1/16 default
     float swing {0.0f};         // 0..1, delays odd steps
+    float humanize {0.0f};      // 0..1 deterministic timing + velocity variation
+    float groove {0.0f};        // 0..1 fixed musical microtiming/accent template
+    float strum {0.0f};         // 0..1 pitch-rank-dependent note spread
     float globalGate {1.0f};    // 0.01..1 global multiplier
     bool restartOnTrigger {true};
     int keyRoot {0};            // 0=C ... 11=B
