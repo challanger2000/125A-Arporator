@@ -77,6 +77,8 @@ void Engine::setSettings(const Settings& settings) noexcept {
         step.gate = std::clamp(step.gate, 0.01f, 1.0f);
         step.ratchet = static_cast<std::uint8_t>(clampInt(step.ratchet, 1, 4));
         step.probability = clamp01(step.probability);
+        step.noteOffset =
+            static_cast<std::int8_t>(clampInt(step.noteOffset, -4, 4));
         step.octaveOffset =
             static_cast<std::int8_t>(clampInt(step.octaveOffset, -4, 4));
     }
@@ -353,6 +355,8 @@ void Engine::emitStep(double stepSample,
             settings_.randomSeed, phaseKey + stepIndex, 0, 0x45565234u);
         const auto h5 = feelHash(
             settings_.randomSeed, phaseKey + stepIndex, 0, 0x45565235u);
+        const auto h6 = feelHash(
+            settings_.randomSeed, phaseKey + stepIndex, 0, 0x45565236u);
 
         if (!settings_.evolveLocks.rhythm &&
             unitFromHash(h0) < 0.10f * settings_.evolve) {
@@ -400,6 +404,15 @@ void Engine::emitStep(double stepSample,
                 -2,
                 2));
         }
+
+        if (!settings_.evolveLocks.note &&
+            unitFromHash(h6) < 0.14f * settings_.evolve) {
+            const int direction = (h6 & 1u) != 0u ? 1 : -1;
+            step.noteOffset = static_cast<std::int8_t>(std::clamp(
+                static_cast<int>(baseStep.noteOffset) + direction,
+                -4,
+                4));
+        }
     }
 
     if (!step.enabled || !probabilityPasses(step.probability))
@@ -422,7 +435,9 @@ void Engine::emitStep(double stepSample,
     if (chordCount <= 0)
         return;
 
-    int pitch = choosePitch(channel, directionIndex_);
+    int pitch = choosePitch(
+        channel,
+        directionIndex_ + static_cast<int>(step.noteOffset));
     if (pitch < 0)
         return;
 
