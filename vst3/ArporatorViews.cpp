@@ -511,6 +511,76 @@ void StepGridView::showStepMenu(int step, const VSTGUI::CPoint& where) {
     menu->forget();
 }
 
+void StepGridView::showRatchetMenu(int step, const VSTGUI::CPoint& where) {
+    if (!controller_ || !getFrame() || step<0 || step>=kStepParamCount)
+        return;
+
+    auto* menu = new VSTGUI::COptionMenu();
+    for (int i=1;i<=4;++i) {
+        char text[16]{};
+        std::snprintf(text,sizeof(text),"%dx",i);
+        menu->addEntry(new VSTGUI::CMenuItem(text,200+(i-1)));
+    }
+
+    auto popupPoint = where;
+    localToFrame(popupPoint);
+    menu->popup(getFrame(),popupPoint,[this,step](VSTGUI::COptionMenu* selectedMenu){
+        if (!controller_ || !selectedMenu)
+            return;
+        int idx=-1;
+        auto* actual=selectedMenu->getLastItemMenu(idx);
+        if (!actual || idx<0)
+            return;
+        auto* item=actual->getEntry(idx);
+        if (!item)
+            return;
+        const int tag=item->getTag();
+        if (tag>=200 && tag<=203) {
+            controller_->editParameter(
+                static_cast<Steinberg::Vst::ParamID>(kStepRatchetBase+step),
+                static_cast<double>(tag-200)/3.0);
+            invalid();
+        }
+    });
+    menu->forget();
+}
+
+void StepGridView::showProbabilityMenu(int step, const VSTGUI::CPoint& where) {
+    if (!controller_ || !getFrame() || step<0 || step>=kStepParamCount)
+        return;
+
+    auto* menu = new VSTGUI::COptionMenu();
+    static constexpr int probs[5]={0,25,50,75,100};
+    for (int i=0;i<5;++i) {
+        char text[16]{};
+        std::snprintf(text,sizeof(text),"%d%%",probs[i]);
+        menu->addEntry(new VSTGUI::CMenuItem(text,300+i));
+    }
+
+    auto popupPoint = where;
+    localToFrame(popupPoint);
+    menu->popup(getFrame(),popupPoint,[this,step](VSTGUI::COptionMenu* selectedMenu){
+        if (!controller_ || !selectedMenu)
+            return;
+        int idx=-1;
+        auto* actual=selectedMenu->getLastItemMenu(idx);
+        if (!actual || idx<0)
+            return;
+        auto* item=actual->getEntry(idx);
+        if (!item)
+            return;
+        const int tag=item->getTag();
+        if (tag>=300 && tag<=304) {
+            static constexpr double p[5]={0.0,0.25,0.50,0.75,1.0};
+            controller_->editParameter(
+                static_cast<Steinberg::Vst::ParamID>(kStepProbabilityBase+step),
+                p[tag-300]);
+            invalid();
+        }
+    });
+    menu->forget();
+}
+
 VSTGUI::CMouseEventResult StepGridView::onMouseDown(
     VSTGUI::CPoint& where,const VSTGUI::CButtonState& buttons) {
     if (!controller_)
@@ -585,15 +655,43 @@ VSTGUI::CMouseEventResult StepGridView::onMouseMoved(
 }
 
 VSTGUI::CMouseEventResult StepGridView::onMouseUp(
-    VSTGUI::CPoint&,const VSTGUI::CButtonState&) {
+    VSTGUI::CPoint& where,const VSTGUI::CButtonState&) {
     if (!controller_ || dragStep_<0)
         return VSTGUI::kMouseEventNotHandled;
 
     if (!dragged_) {
-        const auto id=static_cast<Steinberg::Vst::ParamID>(kStepEnableBase+dragStep_);
-        controller_->editParameter(
-            id,
-            controller_->getParamNormalized(id)>=0.5?0.0:1.0);
+        const auto r=getViewSize();
+        const double gap=5.0;
+        const double cellW=(r.getWidth()-15.0*gap)/16.0;
+        const double cellH=(r.getHeight()-gap)/2.0;
+        const int row=dragStep_/16;
+        const int col=dragStep_%16;
+        const double cellLeft=r.left+col*(cellW+gap);
+        const double cellTop=r.top+row*(cellH+gap);
+        const double localX=where.x-cellLeft;
+        const double localY=where.y-cellTop;
+
+        const int ratchet=1+static_cast<int>(std::lround(
+            controller_->getParamNormalized(kStepRatchetBase+dragStep_)*3.0));
+        const double probability=
+            controller_->getParamNormalized(kStepProbabilityBase+dragStep_);
+
+        // Visible secondary markers are directly interactive. Their hit zones
+        // deliberately match the marker row so normal step ON/OFF clicks remain
+        // unchanged everywhere else.
+        if (localY>=16.0 && localY<=34.0 &&
+            localX<cellW*0.50 && ratchet>1) {
+            showRatchetMenu(dragStep_,where);
+        } else if (localY>=16.0 && localY<=34.0 &&
+                   localX>=cellW*0.50 && probability<0.999) {
+            showProbabilityMenu(dragStep_,where);
+        } else {
+            const auto id=static_cast<Steinberg::Vst::ParamID>(
+                kStepEnableBase+dragStep_);
+            controller_->editParameter(
+                id,
+                controller_->getParamNormalized(id)>=0.5?0.0:1.0);
+        }
     }
 
     dragStep_=-1;
