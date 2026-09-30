@@ -56,7 +56,8 @@
     <view class="CView" custom-view-name="ArpStepGrid" origin="38,252" size="1104,190"/>
 
     <view class="CTextLabel" origin="40,490" size="220,16" title="SELECTED STEP" transparent="true" font-color="Accent" font="Section"/>
-    <view class="CTextLabel" origin="42,520" size="720,95" title="STEP DETAIL EDITOR FOLLOWS AFTER THIS BUILD GATE · SELECTED STEP IS ALREADY TRACKED" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CTextLabel" origin="500,490" size="270,12" title="NOTE/OCTAVE: CLICK LEFT/RIGHT · STRG+KLICK RESET" transparent="true" font-color="Muted" font="Small" text-alignment="right"/>
+    <view class="CView" custom-view-name="ArpSelectedStep" origin="42,520" size="728,104"/>
 
     <view class="CTextLabel" origin="822,490" size="150,16" title="VARIATE / LOCKS" transparent="true" font-color="Accent" font="Section"/>
     <view class="CView" custom-view-name="ArpVariate" control-tag="1020" origin="824,518" size="132,34"/>
