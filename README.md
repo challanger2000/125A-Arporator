@@ -4,9 +4,9 @@ Musical MIDI arpeggiator with a deliberately simple workflow and deeper musical 
 
 ## Development status
 
-Current development branch: `v0.1.0-development`
+Current development branch: `v1.0.0-release`
 
-The V0.1 core is being built measurement-first and GUI-last.
+The V1.0 core is being built measurement-first and GUI-last.
 
 ### Core design targets
 
