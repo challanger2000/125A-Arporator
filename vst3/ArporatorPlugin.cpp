@@ -350,6 +350,7 @@ tresult PLUGIN_API Processor::setActive(TBool state) {
         engine_.reset();
         hadTransportState_ = false;
         wasPlaying_ = false;
+        lastPlayheadPublished_ = -1;
     }
     return AudioEffect::setActive(state);
 }
@@ -363,6 +364,7 @@ tresult PLUGIN_API Processor::setProcessing(TBool state) {
         vstOutputBuffer_.clear();
         hadTransportState_ = false;
         wasPlaying_ = false;
+        lastPlayheadPublished_ = -1;
     }
     return kResultOk;
 }
@@ -675,6 +677,29 @@ tresult PLUGIN_API Processor::process(ProcessData& data) {
         inputBuffer_,
         outputBuffer_);
 
+    const int playheadState =
+        engine_.running() && engine_.lastEmittedStep() >= 0
+            ? std::clamp(engine_.lastEmittedStep() + 1, 1, kStepParamCount)
+            : 0;
+
+    if (playheadState != lastPlayheadPublished_ &&
+        data.outputParameterChanges) {
+        int32 queueIndex = 0;
+        if (auto* queue = data.outputParameterChanges->addParameterData(
+                kPlayheadId, queueIndex)) {
+            int32 pointIndex = 0;
+            const ParamValue normalized =
+                static_cast<ParamValue>(playheadState) /
+                static_cast<ParamValue>(kStepParamCount);
+            const int32 sampleOffset =
+                std::max<int32>(0, data.numSamples - 1);
+            if (queue->addPoint(
+                    sampleOffset, normalized, pointIndex) == kResultTrue) {
+                lastPlayheadPublished_ = playheadState;
+            }
+        }
+    }
+
     if (!data.outputEvents)
         return kResultOk;
 
@@ -888,6 +913,11 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
         0.0, 100.0, 0.0, 0));
 
     parameters.addParameter(new RangeParameter(
+        STR16("Playhead"), kPlayheadId, STR16(""),
+        0.0, 32.0, 0.0, 32,
+        ParameterInfo::kIsHidden | ParameterInfo::kIsReadOnly));
+
+    parameters.addParameter(new RangeParameter(
         STR16("Evolve"), kEvolveId, STR16("%"),
         0.0, 100.0, 0.0, 0));
 
@@ -1027,6 +1057,7 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* state) {
     setNorm(kLockOctaveId, runtime.variationLocks.octave ? 1.0 : 0.0);
     setNorm(kLockNoteId, runtime.variationLocks.note ? 1.0 : 0.0);
     setNorm(kVariateTriggerId, 0.0);
+    setNorm(kPlayheadId, 0.0);
 
     for (int i = 0; i < kStepParamCount; ++i) {
         const auto& step =
@@ -1048,6 +1079,19 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* state) {
     return kResultOk;
 }
 
+
+tresult PLUGIN_API Controller::setParamNormalized(
+    ParamID tag,
+    ParamValue value) {
+    const auto result = EditControllerEx1::setParamNormalized(tag, value);
+    if (result == kResultOk &&
+        tag == kPlayheadId &&
+        editor_ &&
+        editor_->getFrame()) {
+        editor_->getFrame()->invalid();
+    }
+    return result;
+}
 
 tresult PLUGIN_API Controller::setState(IBStream* state) {
     if (!state)
