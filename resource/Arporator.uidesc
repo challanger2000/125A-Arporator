@@ -52,7 +52,7 @@
     <view class="CView" custom-view-name="ArpScale" control-tag="1009" origin="974,152" size="94,25"/>
 
     <view class="CTextLabel" origin="40,226" size="210,16" title="PATTERN · 1–32 STEPS" transparent="true" font-color="Accent" font="Section"/>
-    <view class="CTextLabel" origin="800,226" size="330,14" title="CLICK STEP: SELECT + ON/OFF" transparent="true" font-color="Muted" font="Small" text-alignment="right"/>
+    <view class="CTextLabel" origin="800,226" size="330,14" title="CLICK STEP: SELECT · ON/OFF IN STEP EDITOR" transparent="true" font-color="Muted" font="Small" text-alignment="right"/>
     <view class="CView" custom-view-name="ArpStepGrid" origin="38,252" size="1104,190"/>
 
     <view class="CTextLabel" origin="40,490" size="220,16" title="SELECTED STEP" transparent="true" font-color="Accent" font="Section"/>
@@ -64,17 +64,20 @@
     <view class="CView" custom-view-name="ArpKnob" control-tag="1013" origin="978,508" size="62,56"/>
     <view class="CTextLabel" origin="968,560" size="82,12" title="AMOUNT" transparent="true" font-color="Text" font="Small" text-alignment="center"/>
 
-    <view class="CView" custom-view-name="ArpLock" control-tag="1014" origin="824,582" size="92,24"/>
-    <view class="CTextLabel" origin="824,608" size="92,12" title="RHYTHM" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
-    <view class="CView" custom-view-name="ArpLock" control-tag="1022" origin="922,582" size="92,24"/>
-    <view class="CTextLabel" origin="922,608" size="92,12" title="NOTE" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
-    <view class="CView" custom-view-name="ArpLock" control-tag="1015" origin="1020,582" size="92,24"/>
-    <view class="CTextLabel" origin="1020,608" size="92,12" title="VELOCITY" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
-    <view class="CView" custom-view-name="ArpLock" control-tag="1016" origin="824,624" size="92,24"/>
-    <view class="CTextLabel" origin="824,650" size="92,12" title="GATE" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
-    <view class="CView" custom-view-name="ArpLock" control-tag="1017" origin="922,624" size="92,24"/>
-    <view class="CTextLabel" origin="922,650" size="92,12" title="RATCHET" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
-    <view class="CView" custom-view-name="ArpLock" control-tag="1018" origin="1020,624" size="92,24"/>
-    <view class="CTextLabel" origin="1020,650" size="92,12" title="PROB." transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CView" custom-view-name="ArpLock" control-tag="1014" origin="824,582" size="74,24"/>
+    <view class="CTextLabel" origin="824,608" size="74,12" title="RHYTHM" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CView" custom-view-name="ArpLock" control-tag="1022" origin="904,582" size="74,24"/>
+    <view class="CTextLabel" origin="904,608" size="74,12" title="NOTE" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CView" custom-view-name="ArpLock" control-tag="1015" origin="984,582" size="74,24"/>
+    <view class="CTextLabel" origin="984,608" size="74,12" title="VELOCITY" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CView" custom-view-name="ArpLock" control-tag="1019" origin="1064,582" size="74,24"/>
+    <view class="CTextLabel" origin="1064,608" size="74,12" title="OCTAVE" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+
+    <view class="CView" custom-view-name="ArpLock" control-tag="1016" origin="844,624" size="84,24"/>
+    <view class="CTextLabel" origin="844,650" size="84,12" title="GATE" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CView" custom-view-name="ArpLock" control-tag="1017" origin="944,624" size="84,24"/>
+    <view class="CTextLabel" origin="944,650" size="84,12" title="RATCHET" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CView" custom-view-name="ArpLock" control-tag="1018" origin="1044,624" size="84,24"/>
+    <view class="CTextLabel" origin="1044,650" size="84,12" title="PROB." transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
   </template>
 </vstgui-ui-description>
