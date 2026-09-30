@@ -388,13 +388,13 @@ void StepGridView::draw(VSTGUI::CDrawContext* c) {
 
         if (ratchet>1) {
             char rt[8]{};
-            std::snprintf(rt,sizeof(rt),"%dx",ratchet);
+            std::snprintf(rt,sizeof(rt),"R%d",ratchet);
             c->setFontColor({185,213,235,255});
             c->drawString(rt,{cell.left+4,cell.top+18,cell.right-4,cell.top+31},VSTGUI::kLeftText);
         }
         if (probability<0.999) {
             char pr[8]{};
-            std::snprintf(pr,sizeof(pr),"%d%%",static_cast<int>(std::lround(probability*100.0)));
+            std::snprintf(pr,sizeof(pr),"P%d",static_cast<int>(std::lround(probability*100.0)));
             c->setFontColor(kAmber);
             c->drawString(pr,{cell.left+4,cell.top+18,cell.right-4,cell.top+31},VSTGUI::kRightText);
         }
