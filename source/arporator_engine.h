@@ -99,6 +99,7 @@ public:
                  std::vector<MidiOutput>& output) noexcept;
 
     int currentStep() const noexcept { return currentStep_; }
+    int lastEmittedStep() const noexcept { return lastEmittedStep_; }
     bool running() const noexcept { return running_; }
 
 private:
@@ -130,6 +131,7 @@ private:
     double nextStepSample_ {0.0};
     double lastStepDuration_ {0.0};
     int currentStep_ {0};
+    int lastEmittedStep_ {-1};
     int directionIndex_ {0};
     int directionSign_ {1};
     bool running_ {false};
