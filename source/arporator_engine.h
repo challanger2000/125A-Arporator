@@ -54,7 +54,7 @@ struct Settings {
     float swing {0.0f};         // 0..1, delays odd steps
     float humanize {0.0f};      // 0..1 deterministic timing + velocity variation
     float groove {0.0f};        // 0..1 fixed musical microtiming/accent template
-    float strum {0.0f};         // 0..1 pitch-rank-dependent note spread
+    float strum {0.0f};         // 0..1 short guitar-like held-chord burst
     float evolve {0.0f};        // 0..1 subtle deterministic multi-cycle evolution
     VariationLocks evolveLocks {};
     float globalGate {1.0f};    // 0.01..1 global multiplier
@@ -163,7 +163,8 @@ private:
     std::uint32_t nextRandom() noexcept;
 
     void emitStep(double stepSample,
-                  double stepDuration) noexcept;
+                  double stepDuration,
+                  double sampleRate) noexcept;
 };
 
 } // namespace arporator
