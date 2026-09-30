@@ -349,6 +349,7 @@ void Processor::applyRuntimeState(const RuntimeState& state) noexcept {
     state_.settings.scaleMask =
         scaleMaskForMode(state_.scaleMode);
     engine_.setSettings(state_.settings);
+    variateTrigger_ = 0.0;
     settingsDirty_ = false;
 }
 
@@ -487,12 +488,26 @@ void Processor::readParameterChanges(IParameterChanges* changes) noexcept {
         if (!queue || queue->getPointCount() <= 0)
             continue;
 
+        const auto id = queue->getParameterId();
+
+        // Trigger parameters must consume every point so a short 0->1->0 pulse
+        // inside one host block cannot disappear when only the final value is 0.
+        if (id == kVariateTriggerId) {
+            for (int32 point = 0; point < queue->getPointCount(); ++point) {
+                int32 sampleOffset = 0;
+                ParamValue value = 0.0;
+                if (queue->getPoint(point, sampleOffset, value) == kResultTrue)
+                    applyNormalizedParameter(id, value);
+            }
+            continue;
+        }
+
         int32 sampleOffset = 0;
         ParamValue value = 0.0;
         if (queue->getPoint(queue->getPointCount() - 1,
                             sampleOffset,
                             value) == kResultTrue) {
-            applyNormalizedParameter(queue->getParameterId(), value);
+            applyNormalizedParameter(id, value);
         }
     }
 }
