@@ -437,7 +437,45 @@ void Engine::emitStep(double stepSample,
 
         if (!settings_.evolveLocks.rhythm &&
             unitFromHash(h0) < 0.10f * settings_.evolve) {
-            step.enabled = !step.enabled;
+            bool candidateEnabled = !baseStep.enabled;
+
+            // Never let one Evolve phase mute the complete active pattern.
+            // Evaluate the same deterministic rhythm decision for all other
+            // active steps in this phase before allowing an enabled step to
+            // toggle off.
+            if (!candidateEnabled) {
+                bool anotherEnabled = false;
+                for (int other = 0; other < settings_.patternLength; ++other) {
+                    if (other == stepIndex)
+                        continue;
+
+                    const auto& otherBase =
+                        settings_.steps[static_cast<std::size_t>(other)];
+                    bool otherEnabled = otherBase.enabled;
+
+                    if (!otherBase.locked && !settings_.evolveLocks.rhythm) {
+                        const auto otherH0 = feelHash(
+                            settings_.randomSeed,
+                            phaseKey + other,
+                            0,
+                            0x45565230u);
+                        if (unitFromHash(otherH0) <
+                            0.10f * settings_.evolve) {
+                            otherEnabled = !otherEnabled;
+                        }
+                    }
+
+                    if (otherEnabled) {
+                        anotherEnabled = true;
+                        break;
+                    }
+                }
+
+                if (!anotherEnabled)
+                    candidateEnabled = true;
+            }
+
+            step.enabled = candidateEnabled;
         }
 
         if (!settings_.evolveLocks.velocity) {
