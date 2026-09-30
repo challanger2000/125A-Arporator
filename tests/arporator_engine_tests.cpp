@@ -310,6 +310,131 @@ int main() {
     CHECK(retriggeredAfterStop);
     CHECK(engine.running());
 
+    // Humanize/Groove/Strum at 0% must be bit-for-bit neutral in event timing
+    // and velocity relative to the deterministic base engine.
+    settings = Settings{};
+    settings.patternLength = 4;
+    settings.stepsPerQuarter = 4.0;
+    settings.mode = Mode::Up;
+    settings.restartOnTrigger = true;
+    settings.humanize = 0.0f;
+    settings.groove = 0.0f;
+    settings.strum = 0.0f;
+    for (auto& s : settings.steps) {
+        s.enabled = true;
+        s.velocity = 1.0f;
+        s.gate = 1.0f;
+        s.ratchet = 1;
+        s.probability = 1.0f;
+    }
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 13000,
+                   {
+                       {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 67, 1.0f}
+                   },
+                   out);
+    std::vector<int> neutralOffsets;
+    std::vector<float> neutralVelocities;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn) {
+            neutralOffsets.push_back(e.sampleOffset);
+            neutralVelocities.push_back(e.velocity);
+        }
+    }
+    CHECK(neutralOffsets.size() >= 3);
+    CHECK(neutralOffsets[0] == 0);
+    CHECK(neutralOffsets[1] == 6000);
+    CHECK(neutralOffsets[2] == 12000);
+    CHECK(neutralVelocities[0] == 1.0f);
+    CHECK(neutralVelocities[1] == 1.0f);
+    CHECK(neutralVelocities[2] == 1.0f);
+
+    // Humanize must be deterministic for a fixed seed, change timing and/or
+    // velocity, and keep the phrase start/downbeat much tighter than later steps.
+    settings.humanize = 1.0f;
+    settings.randomSeed = 0x125A3344u;
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 13000,
+                   {
+                       {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 67, 1.0f}
+                   },
+                   out);
+    auto humanA = out;
+    engine.reset();
+    engine.process(48000.0, 120.0, 13000,
+                   {
+                       {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 67, 1.0f}
+                   },
+                   out);
+    CHECK(humanA.size() == out.size());
+    for (std::size_t i = 0; i < out.size(); ++i) {
+        CHECK(humanA[i].type == out[i].type);
+        CHECK(humanA[i].sampleOffset == out[i].sampleOffset);
+        CHECK(humanA[i].pitch == out[i].pitch);
+        CHECK(humanA[i].velocity == out[i].velocity);
+    }
+
+    bool humanChanged = false;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn &&
+            (e.sampleOffset != 0 || e.velocity != 1.0f)) {
+            humanChanged = true;
+        }
+    }
+    CHECK(humanChanged);
+
+    // Groove uses a deterministic eight-step pocket template. Step 1 remains
+    // on-grid; Step 2 is delayed and accented/de-accented according to template.
+    settings.humanize = 0.0f;
+    settings.groove = 1.0f;
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 8000,
+                   {
+                       {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 67, 1.0f}
+                   },
+                   out);
+    std::vector<int> grooveOffsets;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn)
+            grooveOffsets.push_back(e.sampleOffset);
+    }
+    CHECK(grooveOffsets.size() >= 2);
+    CHECK(grooveOffsets[0] == 0);
+    CHECK(grooveOffsets[1] == 6720);
+
+    // Strum spreads later chord ranks without moving the root/first rank.
+    settings.groove = 0.0f;
+    settings.strum = 1.0f;
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 13000,
+                   {
+                       {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 67, 1.0f}
+                   },
+                   out);
+    std::vector<int> strumOffsets;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn)
+            strumOffsets.push_back(e.sampleOffset);
+    }
+    CHECK(strumOffsets.size() >= 3);
+    CHECK(strumOffsets[0] == 0);
+    CHECK(strumOffsets[1] == 6360);
+    CHECK(strumOffsets[2] == 12720);
+
     std::cout << "ArporatorEngineTests PASS\n";
     return EXIT_SUCCESS;
 }
