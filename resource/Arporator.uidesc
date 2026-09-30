@@ -52,7 +52,7 @@
     <view class="CView" custom-view-name="ArpScale" control-tag="1009" origin="974,152" size="94,25"/>
 
     <view class="CTextLabel" origin="40,226" size="210,16" title="PATTERN · 1–32 STEPS" transparent="true" font-color="Accent" font="Section"/>
-    <view class="CTextLabel" origin="500,224" size="630,18" title="NUMBER = DETAILS · R ABOVE P = EDIT · CLICK = ON/OFF · DRAG ↑↓ = VELOCITY · DRAG ↔ = GATE" transparent="true" font-color="Text" font="Label" text-alignment="right"/>
+    <view class="CTextLabel" origin="500,224" size="630,18" title="STEP NUMBER = DETAILS · R = RATCHET · P = PROBABILITY · CLICK R/P = EDIT · CLICK STEP = ON/OFF · DRAG ↑↓ = VELOCITY · DRAG ↔ = GATE" transparent="true" font-color="Text" font="Label" text-alignment="right"/>
     <view class="CView" custom-view-name="ArpStepGrid" origin="38,252" size="1104,260"/>
 
     <view class="CTextLabel" origin="40,528" size="210,18" title="VARIATE" transparent="true" font-color="Accent" font="Section"/>
