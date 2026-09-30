@@ -642,6 +642,7 @@ void Engine::process(double sampleRate,
             currentStep_ = 0;
             directionIndex_ = 0;
             directionSign_ = 1;
+            patternCycle_ = 0u;
 
             // Preserve event ordering semantics inside one timestamp:
             // AllNotesOff followed by a fresh NoteOn at the same sample
