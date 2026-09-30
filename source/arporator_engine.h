@@ -26,6 +26,7 @@ enum class ScalePolicy : std::uint8_t {
 
 struct Step {
     bool enabled {true};
+    bool locked {false};        // Variate/Evolve may not modify this step
     float velocity {1.0f};      // 0..1 multiplier
     float gate {1.0f};          // 0.01..1 per-step multiplier
     std::uint8_t ratchet {1};   // 1..4
