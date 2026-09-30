@@ -22,6 +22,7 @@ namespace {
 
 constexpr std::size_t kInputReserve = 4096;
 constexpr std::size_t kOutputReserve = 8192;
+constexpr std::size_t kVstOutputReserve = 12288;
 constexpr int kRateCount = 11;
 constexpr int kScaleModeCount = 2;
 
@@ -294,6 +295,8 @@ Processor::Processor() {
     engine_.setSettings(state_.settings);
     inputBuffer_.reserve(kInputReserve);
     outputBuffer_.reserve(kOutputReserve);
+    passthroughBuffer_.reserve(kInputReserve);
+    vstOutputBuffer_.reserve(kVstOutputReserve);
     publishedState_.store(state_);
 }
 
@@ -319,6 +322,10 @@ tresult PLUGIN_API Processor::setupProcessing(ProcessSetup& setup) {
         inputBuffer_.reserve(kInputReserve);
     if (outputBuffer_.capacity() < kOutputReserve)
         outputBuffer_.reserve(kOutputReserve);
+    if (passthroughBuffer_.capacity() < kInputReserve)
+        passthroughBuffer_.reserve(kInputReserve);
+    if (vstOutputBuffer_.capacity() < kVstOutputReserve)
+        vstOutputBuffer_.reserve(kVstOutputReserve);
 
     return kResultOk;
 }
@@ -342,6 +349,8 @@ tresult PLUGIN_API Processor::setProcessing(TBool state) {
         engine_.reset();
         inputBuffer_.clear();
         outputBuffer_.clear();
+        passthroughBuffer_.clear();
+        vstOutputBuffer_.clear();
         hadTransportState_ = false;
         wasPlaying_ = false;
     }
@@ -582,6 +591,8 @@ tresult PLUGIN_API Processor::process(ProcessData& data) {
 
     inputBuffer_.clear();
     outputBuffer_.clear();
+    passthroughBuffer_.clear();
+    vstOutputBuffer_.clear();
 
     if (hasTransportState && hadTransportState_ &&
         wasPlaying_ && !playing) {
@@ -628,6 +639,15 @@ tresult PLUGIN_API Processor::process(ProcessData& data) {
                     break;
                 }
                 inputBuffer_.push_back(converted);
+            } else {
+                // Arporator replaces note traffic, but non-note MIDI/event data
+                // should continue downstream whenever the host supplies it.
+                if (passthroughBuffer_.size() < passthroughBuffer_.capacity()) {
+                    event.busIndex = 0;
+                    event.sampleOffset =
+                        std::clamp<int32>(event.sampleOffset, 0, data.numSamples - 1);
+                    passthroughBuffer_.push_back(event);
+                }
             }
         }
     }
@@ -647,6 +667,11 @@ tresult PLUGIN_API Processor::process(ProcessData& data) {
 
     if (!data.outputEvents)
         return kResultOk;
+
+    for (const auto& event : passthroughBuffer_) {
+        if (vstOutputBuffer_.size() < vstOutputBuffer_.capacity())
+            vstOutputBuffer_.push_back(event);
+    }
 
     for (const auto& event : outputBuffer_) {
         Event out {};
@@ -675,8 +700,35 @@ tresult PLUGIN_API Processor::process(ProcessData& data) {
             continue;
         }
 
-        data.outputEvents->addEvent(out);
+        if (vstOutputBuffer_.size() < vstOutputBuffer_.capacity())
+            vstOutputBuffer_.push_back(out);
     }
+
+    const auto eventPriority = [](const Event& event) noexcept {
+        if (event.type == Event::kNoteOffEvent)
+            return 0;
+        if (event.type == Event::kNoteOnEvent)
+            return 2;
+        return 1;
+    };
+    const auto before = [&](const Event& a, const Event& b) noexcept {
+        if (a.sampleOffset != b.sampleOffset)
+            return a.sampleOffset < b.sampleOffset;
+        return eventPriority(a) < eventPriority(b);
+    };
+
+    for (std::size_t i = 1; i < vstOutputBuffer_.size(); ++i) {
+        Event key = vstOutputBuffer_[i];
+        std::size_t j = i;
+        while (j > 0 && before(key, vstOutputBuffer_[j - 1])) {
+            vstOutputBuffer_[j] = vstOutputBuffer_[j - 1];
+            --j;
+        }
+        vstOutputBuffer_[j] = key;
+    }
+
+    for (auto& event : vstOutputBuffer_)
+        data.outputEvents->addEvent(event);
 
     return kResultOk;
 }
