@@ -24,6 +24,8 @@ struct RuntimeState {
     float variationAmount {0.35f};
     VariationLocks variationLocks {};
     std::uint32_t variationCounter {0u};
+    bool variationBaseValid {false};
+    std::array<Step, kMaxSteps> variationBaseSteps {};
 };
 
 class Processor final : public Steinberg::Vst::AudioEffect {
@@ -77,6 +79,7 @@ private:
     bool settingsDirty_ {true};
     bool variateParametersDirty_ {false};
     double variateTrigger_ {0.0};
+    double variateResetTrigger_ {0.0};
     bool hadTransportState_ {false};
     bool wasPlaying_ {false};
     int lastPlayheadPublished_ {-1};
