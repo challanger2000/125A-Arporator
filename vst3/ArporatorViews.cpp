@@ -615,23 +615,27 @@ void UIScaleView::draw(VSTGUI::CDrawContext* c) {
     panel(c,r,true);
     c->setFont(VSTGUI::kNormalFontSmall);
     c->setFontColor(kText);
-    c->drawString(editor_ && editor_->getZoomFactor()>=1.25?"150%":"100%",r,VSTGUI::kCenterText);
+    const double zoom = editor_ ? editor_->getZoomFactor() : 1.0;
+    const char* label = zoom >= 1.35 ? "150%" : (zoom >= 1.10 ? "120%" : "100%");
+    c->drawString(label,r,VSTGUI::kCenterText);
     setDirty(false);
 }
 VSTGUI::CMouseEventResult UIScaleView::onMouseDown(
     VSTGUI::CPoint& where,const VSTGUI::CButtonState& buttons) {
     if (!controller_ || !getViewSize().pointInside(where) || !buttons.isLeftButton())
         return VSTGUI::kMouseEventNotHandled;
-    controller_->setGuiZoom(editor_ && editor_->getZoomFactor()>=1.25?1.0:1.5);
+    const double zoom = editor_ ? editor_->getZoomFactor() : 1.0;
+    controller_->setGuiZoom(zoom < 1.10 ? 1.2 : (zoom < 1.35 ? 1.5 : 1.0));
     invalid();
     return VSTGUI::kMouseDownEventHandledButDontNeedMovedOrUpEvents;
 }
 
 void configureEditor(VSTGUI::VST3Editor* editor,double width,double height,double zoom) {
     if (!editor) return;
-    editor->setAllowedZoomFactors(std::vector<double>{1.0,1.5});
+    editor->setAllowedZoomFactors(std::vector<double>{1.0,1.2,1.5});
     editor->setEditorSizeConstrains({width,height},{width,height});
-    editor->setZoomFactor(zoom>=1.25?1.5:1.0);
+    const double resolved = zoom >= 1.35 ? 1.5 : (zoom >= 1.10 ? 1.2 : 1.0);
+    editor->setZoomFactor(resolved);
 }
 
 VSTGUI::CView* createCustomView(VSTGUI::UTF8StringPtr name,
@@ -653,6 +657,7 @@ VSTGUI::CView* createCustomView(VSTGUI::UTF8StringPtr name,
     if(std::strcmp(name,"ArpUIScale")==0) return new UIScaleView(rect,editor,controller);
     if(std::strcmp(name,"ArpStepGrid")==0) return new StepGridView(rect,controller);
     if(std::strcmp(name,"ArpVariate")==0 && tag>=0) return new ActionButton(rect,controller,tag,"VARIATE");
+    if(std::strcmp(name,"ArpVariateReset")==0 && tag>=0) return new ActionButton(rect,controller,tag,"RESET");
 
     if(std::strcmp(name,"ArpMode")==0) return new PopupSelectorView(rect,editor,tag,{"UP","DOWN","UP-DOWN","DOWN-UP","PLAYED","RANDOM"});
     if(std::strcmp(name,"ArpRate")==0) return new PopupSelectorView(rect,editor,tag,{"1/4","1/8","1/16","1/32","1/64","1/8T","1/16T","1/32T","1/8D","1/16D","1/32D"});
