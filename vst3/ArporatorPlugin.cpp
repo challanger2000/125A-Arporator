@@ -24,7 +24,7 @@ constexpr std::size_t kInputReserve = 4096;
 constexpr std::size_t kOutputReserve = 8192;
 constexpr std::size_t kVstOutputReserve = 12288;
 constexpr int kRateCount = 11;
-constexpr int kScaleModeCount = 2;
+constexpr int kScaleModeCount = 10;
 
 double clamp01(double value) noexcept {
     if (!std::isfinite(value))
@@ -42,6 +42,14 @@ int normIndex(double value, int maxIndex) noexcept {
 std::uint16_t scaleMask(int index) noexcept {
     switch (std::clamp(index, 0, kScaleModeCount - 1)) {
         case 1: return 0x05ADu; // natural minor
+        case 2: return 0x06ADu; // dorian
+        case 3: return 0x05ABu; // phrygian
+        case 4: return 0x0AD5u; // lydian
+        case 5: return 0x06B5u; // mixolydian
+        case 6: return 0x09ADu; // harmonic minor
+        case 7: return 0x0295u; // major pentatonic
+        case 8: return 0x04A9u; // minor pentatonic
+        case 9: return 0x04E9u; // blues
         default: return 0x0AB5u; // major
     }
 }
@@ -855,6 +863,14 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
         new StringListParameter(STR16("Scale"), kScaleModeId);
     scale->appendString(STR16("MAJOR"));
     scale->appendString(STR16("MINOR"));
+    scale->appendString(STR16("DORIAN"));
+    scale->appendString(STR16("PHRYGIAN"));
+    scale->appendString(STR16("LYDIAN"));
+    scale->appendString(STR16("MIXOLYDIAN"));
+    scale->appendString(STR16("HARMONIC MINOR"));
+    scale->appendString(STR16("MAJOR PENT"));
+    scale->appendString(STR16("MINOR PENT"));
+    scale->appendString(STR16("BLUES"));
     parameters.addParameter(scale);
 
     parameters.addParameter(new RangeParameter(
