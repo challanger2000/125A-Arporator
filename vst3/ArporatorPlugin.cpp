@@ -836,8 +836,8 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
     rate->appendString(STR16("1/8D"));
     rate->appendString(STR16("1/16D"));
     rate->appendString(STR16("1/32D"));
-    rate->getInfo().defaultNormalized = 2.0 / 10.0;
-    rate->setNormalized(rate->getInfo().defaultNormalized);
+    rate->getInfo().defaultNormalizedValue = 2.0 / 10.0;
+    rate->setNormalized(rate->getInfo().defaultNormalizedValue);
     parameters.addParameter(rate);
 
     auto* octaves = new StringListParameter(STR16("Octaves"), kOctavesId);
@@ -952,7 +952,7 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
             new StringListParameter(enableTitle.c_str(), kStepEnableBase + i);
         enabled->appendString(STR16("OFF"));
         enabled->appendString(STR16("ON"));
-        enabled->getInfo().defaultNormalized = 1.0;
+        enabled->getInfo().defaultNormalizedValue = 1.0;
         enabled->setNormalized(1.0);
         parameters.addParameter(enabled);
 
@@ -992,8 +992,8 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
         note->appendString(STR16("+2"));
         note->appendString(STR16("+3"));
         note->appendString(STR16("+4"));
-        note->getInfo().defaultNormalized = 0.5;
-        note->setNormalized(note->getInfo().defaultNormalized);
+        note->getInfo().defaultNormalizedValue = 0.5;
+        note->setNormalized(note->getInfo().defaultNormalizedValue);
         parameters.addParameter(note);
 
         auto octaveTitle = makeStepTitle(i, u"Octave");
@@ -1004,8 +1004,8 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
         octave->appendString(STR16("0"));
         octave->appendString(STR16("+1"));
         octave->appendString(STR16("+2"));
-        octave->getInfo().defaultNormalized = 0.5;
-        octave->setNormalized(octave->getInfo().defaultNormalized);
+        octave->getInfo().defaultNormalizedValue = 0.5;
+        octave->setNormalized(octave->getInfo().defaultNormalizedValue);
         parameters.addParameter(octave);
 
         auto lockTitle = makeStepTitle(i, u"Lock");
