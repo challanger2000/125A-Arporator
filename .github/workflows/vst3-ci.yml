@@ -24,6 +24,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Run GUI contract
+        run: python tools/qa_gui_contract.py
+
       - name: Configure
         run: cmake -S . -B build -DARPORATOR_BUILD_VST3=ON
 
