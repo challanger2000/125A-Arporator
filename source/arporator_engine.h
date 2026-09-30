@@ -40,6 +40,7 @@ struct Settings {
     int octaveRange {1};        // 1..4
     double stepsPerQuarter {4.0}; // 1/16 default
     float swing {0.0f};         // 0..1, delays odd steps
+    float globalGate {1.0f};    // 0.01..1 global multiplier
     bool restartOnTrigger {true};
     int keyRoot {0};            // 0=C ... 11=B
     std::uint16_t scaleMask {0x0AB5}; // major scale pitch-class mask by default
