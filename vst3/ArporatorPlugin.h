@@ -68,6 +68,8 @@ private:
 
     std::vector<MidiInput> inputBuffer_ {};
     std::vector<MidiOutput> outputBuffer_ {};
+    std::vector<Steinberg::Vst::Event> passthroughBuffer_ {};
+    std::vector<Steinberg::Vst::Event> vstOutputBuffer_ {};
 
     double sampleRate_ {48000.0};
     bool settingsDirty_ {true};
