@@ -40,22 +40,19 @@ required = {
     "ArpLogo": 1,
     "ArpUIScale": 1,
     "ArpStepGrid": 1,
-    "ArpSelectedStep": 1,
     "ArpVariate": 1,
 }
 for name, count in required.items():
     actual = len(custom.get(name, []))
     assert actual == count, f"{name}: expected {count}, found {actual}"
 
-step = custom["ArpSelectedStep"][0]
-sw, sh = pair(step.attrib["size"])
-assert abs(sw - 728.0) < 1e-9 and abs(sh - 104.0) < 1e-9, (
-    f"selected-step editor contract changed unexpectedly: {sw}x{sh}"
+assert not custom.get("ArpSelectedStep"), (
+    "separate selected-step panel must not return; step editing belongs in the pattern grid"
 )
 
 grid = custom["ArpStepGrid"][0]
 gw, gh = pair(grid.attrib["size"])
-assert gw >= 1000 and gh >= 180, f"step grid became too small: {gw}x{gh}"
+assert gw >= 1000 and gh >= 240, f"direct-edit step grid became too small: {gw}x{gh}"
 
 # Seven global dimension locks are required by the V0.1 behaviour contract.
 lock_tags = sorted(
