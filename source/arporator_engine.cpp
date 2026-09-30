@@ -69,6 +69,7 @@ void Engine::setSettings(const Settings& settings) noexcept {
     settings_.humanize = clamp01(settings_.humanize);
     settings_.groove = clamp01(settings_.groove);
     settings_.strum = clamp01(settings_.strum);
+    settings_.evolve = clamp01(settings_.evolve);
     settings_.globalGate = std::clamp(settings_.globalGate, 0.01f, 1.0f);
     settings_.keyRoot = positiveMod(settings_.keyRoot, 12);
     for (auto& step : settings_.steps) {
@@ -96,6 +97,7 @@ void Engine::reset() noexcept {
     orderCounter_ = 0;
     rng_ = settings_.randomSeed ? settings_.randomSeed : 0x125A0001u;
     nextNoteId_ = 1;
+    patternCycle_ = 0u;
 }
 
 bool Engine::anyHeld() const noexcept {
@@ -121,16 +123,16 @@ std::uint32_t Engine::nextRandom() noexcept {
     return rng_;
 }
 
-bool Engine::stepPassesProbability(int step) noexcept {
-    const auto& s = settings_.steps[static_cast<std::size_t>(step)];
-    if (s.probability >= 1.0f)
+bool Engine::probabilityPasses(float probability) noexcept {
+    probability = clamp01(probability);
+    if (probability >= 1.0f)
         return true;
-    if (s.probability <= 0.0f)
+    if (probability <= 0.0f)
         return false;
     const float unit =
         static_cast<float>(nextRandom() & 0x00FFFFFFu) /
         static_cast<float>(0x01000000u);
-    return unit < s.probability;
+    return unit < probability;
 }
 
 int Engine::collectOrderedPitches(
@@ -326,9 +328,81 @@ void Engine::emitStep(double stepSample,
                       int blockSize,
                       std::vector<MidiOutput>& output) noexcept {
     const int stepIndex = clampInt(currentStep_, 0, settings_.patternLength - 1);
-    const auto& step = settings_.steps[static_cast<std::size_t>(stepIndex)];
+    const auto& baseStep = settings_.steps[static_cast<std::size_t>(stepIndex)];
+    Step step = baseStep;
 
-    if (!step.enabled || !stepPassesProbability(stepIndex))
+    // EVOLVE is non-destructive: derive a temporary effective step from the
+    // stored base step. Phase 0 leaves the first four full pattern cycles
+    // untouched; later phases change only unlocked dimensions.
+    const std::uint64_t evolvePhase = patternCycle_ / 4u;
+    if (settings_.evolve > 0.0f &&
+        evolvePhase > 0u &&
+        !baseStep.locked) {
+        const int phaseKey = static_cast<int>(
+            (evolvePhase * 131u) & 0x7FFFFFFFu);
+
+        const auto h0 = feelHash(
+            settings_.randomSeed, phaseKey + stepIndex, 0, 0x45565230u);
+        const auto h1 = feelHash(
+            settings_.randomSeed, phaseKey + stepIndex, 0, 0x45565231u);
+        const auto h2 = feelHash(
+            settings_.randomSeed, phaseKey + stepIndex, 0, 0x45565232u);
+        const auto h3 = feelHash(
+            settings_.randomSeed, phaseKey + stepIndex, 0, 0x45565233u);
+        const auto h4 = feelHash(
+            settings_.randomSeed, phaseKey + stepIndex, 0, 0x45565234u);
+        const auto h5 = feelHash(
+            settings_.randomSeed, phaseKey + stepIndex, 0, 0x45565235u);
+
+        if (!settings_.evolveLocks.rhythm &&
+            unitFromHash(h0) < 0.10f * settings_.evolve) {
+            step.enabled = !step.enabled;
+        }
+
+        if (!settings_.evolveLocks.velocity) {
+            step.velocity = std::clamp(
+                baseStep.velocity +
+                    bipolarFromHash(h1) * 0.12f * settings_.evolve,
+                0.10f,
+                1.0f);
+        }
+
+        if (!settings_.evolveLocks.gate) {
+            step.gate = std::clamp(
+                baseStep.gate +
+                    bipolarFromHash(h2) * 0.14f * settings_.evolve,
+                0.10f,
+                1.0f);
+        }
+
+        if (!settings_.evolveLocks.ratchet &&
+            unitFromHash(h3) < 0.12f * settings_.evolve) {
+            const int direction = (h3 & 1u) != 0u ? 1 : -1;
+            step.ratchet = static_cast<std::uint8_t>(std::clamp(
+                static_cast<int>(baseStep.ratchet) + direction,
+                1,
+                4));
+        }
+
+        if (!settings_.evolveLocks.probability) {
+            step.probability = std::clamp(
+                baseStep.probability +
+                    bipolarFromHash(h4) * 0.14f * settings_.evolve,
+                0.10f,
+                1.0f);
+        }
+
+        if (!settings_.evolveLocks.octave &&
+            unitFromHash(h5) < 0.10f * settings_.evolve) {
+            const int direction = (h5 & 1u) != 0u ? 1 : -1;
+            step.octaveOffset = static_cast<std::int8_t>(std::clamp(
+                static_cast<int>(baseStep.octaveOffset) + direction,
+                -2,
+                2));
+        }
+    }
+
+    if (!step.enabled || !probabilityPasses(step.probability))
         return;
 
     int channel = -1;
@@ -502,7 +576,12 @@ void Engine::process(double sampleRate,
             if (scheduled >= blockStart)
                 emitStep(scheduled, stepDuration, blockStart, numSamples, output);
 
+            const int previousStep = currentStep_;
             currentStep_ = (currentStep_ + 1) % settings_.patternLength;
+            if (previousStep == settings_.patternLength - 1 &&
+                currentStep_ == 0) {
+                ++patternCycle_;
+            }
             ++directionIndex_;
             nextStepSample_ += stepDuration;
         }
