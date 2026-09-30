@@ -17,6 +17,7 @@
     <view class="CView" custom-view-name="ArpLogo" origin="34,24" size="86,43" mouse-enabled="false"/>
     <view class="CTextLabel" origin="390,24" size="400,25" title="ARPORATOR" transparent="true" font-color="Text" font="Title" text-alignment="center"/>
     <view class="CTextLabel" origin="380,50" size="420,13" title="MUSICAL MIDI ARPEGGIATOR · V0.1" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CTextLabel" origin="820,57" size="320,11" title="SELECTORS: LEFT = PREV · RIGHT = NEXT" transparent="true" font-color="Muted" font="Small" text-alignment="right"/>
     <view class="CView" custom-view-name="ArpUIScale" origin="1068,30" size="68,24"/>
 
     <view class="CTextLabel" origin="36,96" size="82,12" title="MODE" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
@@ -56,7 +57,7 @@
     <view class="CView" custom-view-name="ArpStepGrid" origin="38,252" size="1104,190"/>
 
     <view class="CTextLabel" origin="40,490" size="220,16" title="SELECTED STEP" transparent="true" font-color="Accent" font="Section"/>
-    <view class="CTextLabel" origin="500,490" size="270,12" title="NOTE/OCTAVE: CLICK LEFT/RIGHT · STRG+KLICK RESET" transparent="true" font-color="Muted" font="Small" text-alignment="right"/>
+    <view class="CTextLabel" origin="500,490" size="270,12" title="LEFT/RIGHT = −/+ · RIGHT EDGE = 100% · STRG+KLICK RESET" transparent="true" font-color="Muted" font="Small" text-alignment="right"/>
     <view class="CView" custom-view-name="ArpSelectedStep" origin="42,520" size="728,104"/>
 
     <view class="CTextLabel" origin="822,490" size="150,16" title="VARIATE / LOCKS" transparent="true" font-color="Accent" font="Section"/>
