@@ -417,7 +417,7 @@ void Engine::emitStep(double stepSample,
     Step step = baseStep;
 
     // EVOLVE is non-destructive: derive a temporary effective step from the
-    // stored base step. Phase 0 leaves the first four full pattern cycles
+    // stored base step. Phase 0 leaves the first two full pattern cycles
     // untouched; later phases change only unlocked dimensions.
     const std::uint64_t evolvePhase = patternCycle_ / 2u;
     if (settings_.evolve > 0.0f &&
