@@ -24,8 +24,8 @@ jobs:
       - name: Configure
         run: cmake -S . -B build -DARPORATOR_BUILD_VST3=ON
 
-      - name: Build VST3
-        run: cmake --build build --config Release --target Arporator --parallel
+      - name: Build VST3 and tests
+        run: cmake --build build --config Release --parallel
 
       - name: Run core tests
         run: ctest --test-dir build -C Release --output-on-failure
