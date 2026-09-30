@@ -386,24 +386,18 @@ void StepGridView::draw(VSTGUI::CDrawContext* c) {
             {cell.left+13,cell.bottom-7,cell.left+13+gateW,cell.bottom-4},
             VSTGUI::kDrawFilled);
 
-        {
-            // Ratchet is always visible so every step can be edited directly,
-            // including the neutral 1x state (R1).
+        // Neutral secondary values stay visually silent. Their click zones
+        // remain active, so R1/P100 can still be changed without right-click.
+        if (ratchet > 1) {
             char rt[8]{};
             std::snprintf(rt,sizeof(rt),"R%d",ratchet);
-            c->setFontColor(ratchet>1
-                ? VSTGUI::CColor{185,213,235,255}
-                : VSTGUI::CColor{137,143,151,210});
+            c->setFontColor({185,213,235,255});
             c->drawString(rt,{cell.left+4,cell.top+17,cell.right-4,cell.top+29},VSTGUI::kCenterText);
         }
-        {
-            // Probability is always visible so the neutral P100 state can be
-            // edited directly without requiring Variate or a right-click.
+        if (probability < 0.999) {
             char pr[8]{};
             std::snprintf(pr,sizeof(pr),"P%d",static_cast<int>(std::lround(probability*100.0)));
-            c->setFontColor(probability<0.999
-                ? kAmber
-                : VSTGUI::CColor{137,143,151,210});
+            c->setFontColor(kAmber);
             c->drawString(pr,{cell.left+4,cell.top+30,cell.right-4,cell.top+42},VSTGUI::kCenterText);
         }
     }
