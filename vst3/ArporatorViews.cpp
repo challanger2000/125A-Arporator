@@ -318,6 +318,14 @@ void StepGridView::draw(VSTGUI::CDrawContext* c) {
     const double cellH=(r.getHeight()-gap)/2.0;
     const int length=1+static_cast<int>(std::lround(
         controller_->getParamNormalized(kPatternLengthId)*31.0));
+    const double playheadNormalized =
+        controller_->getParamNormalized(kPlayheadId);
+    const int playheadState = std::clamp(
+        static_cast<int>(std::lround(
+            playheadNormalized * static_cast<double>(kStepParamCount))),
+        0,
+        static_cast<int>(kStepParamCount));
+    const int playheadStep = playheadState > 0 ? playheadState - 1 : -1;
 
     for(int i=0;i<32;++i) {
         const int row=i/16,col=i%16;
@@ -328,6 +336,7 @@ void StepGridView::draw(VSTGUI::CDrawContext* c) {
         const bool enabled=controller_->getParamNormalized(kStepEnableBase+i)>=0.5;
         const bool locked=controller_->getParamNormalized(kStepLockBase+i)>=0.5;
         const bool selected=i==controller_->selectedStep();
+        const bool playing=i==playheadStep;
         const double velocity=controller_->getParamNormalized(kStepVelocityBase+i);
         const int ratchet=1+static_cast<int>(std::lround(controller_->getParamNormalized(kStepRatchetBase+i)*3.0));
         const double probability=controller_->getParamNormalized(kStepProbabilityBase+i);
@@ -338,6 +347,21 @@ void StepGridView::draw(VSTGUI::CDrawContext* c) {
                          locked?VSTGUI::CColor{215,25,32,210}:kBorder);
         c->setLineWidth(selected?2.0:1.0);
         c->drawRect(cell,VSTGUI::kDrawFilledAndStroked);
+
+        // Playback and edit selection are intentionally distinct: the selected
+        // step owns the outer border, while the running step gets a bright
+        // inner top strip and a subtle inner frame.
+        if (playing && inLength) {
+            c->setFillColor({132,211,255,255});
+            c->drawRect(
+                {cell.left+3,cell.top+3,cell.right-3,cell.top+7},
+                VSTGUI::kDrawFilled);
+            c->setFrameColor({132,211,255,180});
+            c->setLineWidth(1.0);
+            c->drawRect(
+                {cell.left+2,cell.top+2,cell.right-2,cell.bottom-2},
+                VSTGUI::kDrawStroked);
+        }
 
         char num[8]{};
         std::snprintf(num,sizeof(num),"%02d",i+1);
