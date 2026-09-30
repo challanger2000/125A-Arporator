@@ -494,6 +494,7 @@ void Processor::applyNormalizedParameter(ParamID id, double value) noexcept {
             request.seed = state_.settings.randomSeed ^
                 (0x9E3779B9u * state_.variationCounter);
             state_.settings = variateSettings(state_.settings, request);
+            variateParametersDirty_ = true;
         }
     } else if (id >= kStepEnableBase &&
                id < kStepEnableBase + kStepParamCount) {
@@ -580,6 +581,42 @@ tresult PLUGIN_API Processor::process(ProcessData& data) {
         engine_.setSettings(state_.settings);
         settingsDirty_ = false;
         publishState();
+    }
+
+    // Variate mutates the stored pattern in the processor. Mirror the changed
+    // step values back to the host/controller exactly once so GUI, automation
+    // state and processor playback cannot diverge.
+    if (variateParametersDirty_ && data.outputParameterChanges) {
+        const auto publishParam = [&](ParamID id, ParamValue normalized) {
+            int32 queueIndex = 0;
+            if (auto* queue =
+                    data.outputParameterChanges->addParameterData(id, queueIndex)) {
+                int32 pointIndex = 0;
+                queue->addPoint(0, clamp01(normalized), pointIndex);
+            }
+        };
+
+        for (int i = 0; i < kStepParamCount; ++i) {
+            const auto& step =
+                state_.settings.steps[static_cast<std::size_t>(i)];
+            publishParam(kStepEnableBase + i, step.enabled ? 1.0 : 0.0);
+            publishParam(kStepVelocityBase + i, step.velocity);
+            publishParam(
+                kStepGateBase + i,
+                (static_cast<double>(step.gate) - 0.01) / 0.99);
+            publishParam(
+                kStepRatchetBase + i,
+                static_cast<double>(step.ratchet - 1) / 3.0);
+            publishParam(kStepProbabilityBase + i, step.probability);
+            publishParam(
+                kStepNoteBase + i,
+                static_cast<double>(step.noteOffset + 4) / 8.0);
+            publishParam(
+                kStepOctaveBase + i,
+                static_cast<double>(step.octaveOffset + 2) / 4.0);
+        }
+
+        variateParametersDirty_ = false;
     }
 
     if (data.numSamples <= 0)
