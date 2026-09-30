@@ -16,7 +16,7 @@
     <view class="CView" custom-view-name="ArpFaceplate" origin="0,0" size="1180,680" mouse-enabled="false"/>
     <view class="CView" custom-view-name="ArpLogo" origin="34,24" size="86,43" mouse-enabled="false"/>
     <view class="CTextLabel" origin="390,24" size="400,25" title="ARPORATOR" transparent="true" font-color="Text" font="Title" text-alignment="center"/>
-    <view class="CTextLabel" origin="380,50" size="420,13" title="MUSICAL MIDI ARPEGGIATOR · V0.1" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
+    <view class="CTextLabel" origin="380,50" size="420,13" title="MUSICAL MIDI ARPEGGIATOR · V1.0" transparent="true" font-color="Muted" font="Small" text-alignment="center"/>
     <view class="CView" custom-view-name="ArpUIScale" origin="1068,30" size="68,24"/>
 
     <view class="CTextLabel" origin="36,95" size="82,14" title="MODE" transparent="true" font-color="Muted" font="Label" text-alignment="center"/>
