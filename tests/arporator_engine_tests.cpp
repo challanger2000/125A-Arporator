@@ -435,6 +435,79 @@ int main() {
     CHECK(strumOffsets[1] == 6360);
     CHECK(strumOffsets[2] == 12720);
 
+    // EVOLVE is non-destructive and deliberately slow: the first four full
+    // pattern cycles are identical to the stored pattern, then a deterministic
+    // phase may alter only unlocked performance properties.
+    settings = Settings{};
+    settings.patternLength = 1;
+    settings.stepsPerQuarter = 4.0;
+    settings.mode = Mode::Up;
+    settings.restartOnTrigger = true;
+    settings.evolve = 1.0f;
+    settings.randomSeed = 0x125A4455u;
+    settings.steps[0].enabled = true;
+    settings.steps[0].velocity = 0.70f;
+    settings.steps[0].gate = 0.80f;
+    settings.steps[0].ratchet = 1;
+    settings.steps[0].probability = 1.0f;
+    settings.steps[0].octaveOffset = 0;
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 31000,
+                   {{MidiInput::Type::NoteOn, 0, 0, 60, 1.0f}},
+                   out);
+    std::vector<MidiOutput> evolveOns;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn)
+            evolveOns.push_back(e);
+    }
+    CHECK(evolveOns.size() >= 5);
+    CHECK(evolveOns[0].sampleOffset == 0);
+    CHECK(evolveOns[1].sampleOffset == 6000);
+    CHECK(evolveOns[2].sampleOffset == 12000);
+    CHECK(evolveOns[3].sampleOffset == 18000);
+    CHECK(evolveOns[0].velocity == 0.70f);
+    CHECK(evolveOns[1].velocity == 0.70f);
+    CHECK(evolveOns[2].velocity == 0.70f);
+    CHECK(evolveOns[3].velocity == 0.70f);
+    CHECK(evolveOns[4].sampleOffset == 24000);
+    CHECK(evolveOns[4].velocity != 0.70f);
+
+    // Per-step lock also freezes non-destructive Evolve.
+    settings.steps[0].locked = true;
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 31000,
+                   {{MidiInput::Type::NoteOn, 0, 0, 60, 1.0f}},
+                   out);
+    evolveOns.clear();
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn)
+            evolveOns.push_back(e);
+    }
+    CHECK(evolveOns.size() >= 5);
+    CHECK(evolveOns[4].velocity == 0.70f);
+
+    // A fresh RESTART phrase resets Evolve to its untouched phase 0.
+    settings.steps[0].locked = false;
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 31000,
+                   {{MidiInput::Type::NoteOn, 0, 0, 60, 1.0f}},
+                   out);
+    engine.process(48000.0, 120.0, 1000,
+                   {{MidiInput::Type::NoteOn, 100, 0, 64, 1.0f}},
+                   out);
+    bool restartBaseVelocity = false;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn &&
+            e.sampleOffset == 100 &&
+            e.velocity == 0.70f) {
+            restartBaseVelocity = true;
+        }
+    }
+    CHECK(restartBaseVelocity);
+
     std::cout << "ArporatorEngineTests PASS\n";
     return EXIT_SUCCESS;
 }
