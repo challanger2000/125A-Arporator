@@ -508,6 +508,97 @@ int main() {
     }
     CHECK(restartBaseVelocity);
 
+    // EVOLVE at 0% is exactly neutral across many cycles.
+    settings = Settings{};
+    settings.patternLength = 2;
+    settings.stepsPerQuarter = 4.0;
+    settings.mode = Mode::Up;
+    settings.restartOnTrigger = true;
+    settings.evolve = 0.0f;
+    settings.randomSeed = 0x125A7788u;
+    for (auto& s : settings.steps) {
+        s.enabled = true;
+        s.velocity = 0.73f;
+        s.gate = 0.81f;
+        s.ratchet = 1;
+        s.probability = 1.0f;
+        s.noteOffset = 0;
+        s.octaveOffset = 0;
+    }
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 97000,
+                   {
+                       {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f}
+                   },
+                   out);
+    std::vector<MidiOutput> neutralEvolve;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn)
+            neutralEvolve.push_back(e);
+    }
+    CHECK(neutralEvolve.size() >= 16);
+    for (const auto& e : neutralEvolve) {
+        CHECK(e.velocity == 0.73f);
+        CHECK(e.pitch == 60 || e.pitch == 64);
+    }
+
+    // Locking every Evolve dimension must make 100% Evolve audibly neutral.
+    settings.evolve = 1.0f;
+    settings.evolveLocks.rhythm = true;
+    settings.evolveLocks.velocity = true;
+    settings.evolveLocks.gate = true;
+    settings.evolveLocks.ratchet = true;
+    settings.evolveLocks.probability = true;
+    settings.evolveLocks.octave = true;
+    settings.evolveLocks.note = true;
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 97000,
+                   {
+                       {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f}
+                   },
+                   out);
+    std::vector<MidiOutput> lockedEvolve;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn)
+            lockedEvolve.push_back(e);
+    }
+    CHECK(lockedEvolve.size() == neutralEvolve.size());
+    for (std::size_t i = 0; i < lockedEvolve.size(); ++i) {
+        CHECK(lockedEvolve[i].sampleOffset == neutralEvolve[i].sampleOffset);
+        CHECK(lockedEvolve[i].pitch == neutralEvolve[i].pitch);
+        CHECK(lockedEvolve[i].velocity == neutralEvolve[i].velocity);
+    }
+
+    // Even at 100% with rhythm unlocked, a one-step pattern may never evolve
+    // into a completely silent phase.
+    settings = Settings{};
+    settings.patternLength = 1;
+    settings.stepsPerQuarter = 4.0;
+    settings.mode = Mode::Up;
+    settings.restartOnTrigger = true;
+    settings.evolve = 1.0f;
+    settings.randomSeed = 0x125A9901u;
+    settings.steps[0].enabled = true;
+    settings.steps[0].velocity = 1.0f;
+    settings.steps[0].gate = 1.0f;
+    settings.steps[0].ratchet = 1;
+    settings.steps[0].probability = 1.0f;
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 193000,
+                   {{MidiInput::Type::NoteOn, 0, 0, 60, 1.0f}},
+                   out);
+    std::size_t oneStepOns = 0;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn)
+            ++oneStepOns;
+    }
+    CHECK(oneStepOns >= 32);
+
     // Per-step NOTE selects a relative position in the arp order rather than
     // a chromatic semitone. This keeps CHORD ONLY / SCALE behaviour musical.
     settings = Settings{};
