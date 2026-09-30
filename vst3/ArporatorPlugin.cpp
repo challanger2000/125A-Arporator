@@ -1246,6 +1246,59 @@ tresult PLUGIN_API Controller::setState(IBStream* state) {
         selected = 0;
     guiZoom_ = zoom >= 1.35 ? 1.5 : (zoom >= 1.10 ? 1.2 : 1.0);
     selectedStep_ = std::clamp<int32>(selected, 0, kStepParamCount - 1);
+
+    // Controller-state extension (backward compatible): Studio One may restore
+    // controller and processor state independently. Persist the captured
+    // pre-Variate pattern here as well so RESET never depends on a later
+    // setComponentState() callback to recover its baseline.
+    int32 previewMagic = 0;
+    if (stream.readInt32(previewMagic) && previewMagic == 0x41525056) { // "ARPV"
+        int32 previewValid = 0;
+        if (stream.readInt32(previewValid)) {
+            std::array<Step, kMaxSteps> restored {};
+            bool ok = true;
+            for (auto& step : restored) {
+                int32 enabled = 1;
+                int32 locked = 0;
+                int32 noteOffset = 0;
+                int32 ratchet = 1;
+                int32 octave = 0;
+                double velocity = 1.0;
+                double gate = 1.0;
+                double probability = 1.0;
+                ok = ok &&
+                    stream.readInt32(enabled) &&
+                    stream.readInt32(locked) &&
+                    stream.readInt32(noteOffset) &&
+                    stream.readDouble(velocity) &&
+                    stream.readDouble(gate) &&
+                    stream.readInt32(ratchet) &&
+                    stream.readDouble(probability) &&
+                    stream.readInt32(octave);
+                if (!ok)
+                    break;
+                step.enabled = enabled != 0;
+                step.locked = locked != 0;
+                step.noteOffset =
+                    static_cast<std::int8_t>(std::clamp(noteOffset, -4, 4));
+                step.velocity =
+                    static_cast<float>(std::clamp(velocity, 0.0, 1.0));
+                step.gate =
+                    static_cast<float>(std::clamp(gate, 0.01, 1.0));
+                step.ratchet =
+                    static_cast<std::uint8_t>(std::clamp(ratchet, 1, 4));
+                step.probability =
+                    static_cast<float>(std::clamp(probability, 0.0, 1.0));
+                step.octaveOffset =
+                    static_cast<std::int8_t>(std::clamp(octave, -2, 2));
+            }
+            if (ok) {
+                variationBasePreviewValid_ = previewValid != 0;
+                variationBasePreviewSteps_ = restored;
+            }
+        }
+    }
+
     if (editor_)
         editor_->setZoomFactor(guiZoom_);
     return kResultOk;
@@ -1255,9 +1308,26 @@ tresult PLUGIN_API Controller::getState(IBStream* state) {
     if (!state)
         return kInvalidArgument;
     IBStreamer stream(state, kLittleEndian);
-    return stream.writeDouble(guiZoom_) &&
-           stream.writeInt32(static_cast<int32>(selectedStep_))
-        ? kResultOk : kResultFalse;
+    if (!stream.writeDouble(guiZoom_) ||
+        !stream.writeInt32(static_cast<int32>(selectedStep_)) ||
+        !stream.writeInt32(0x41525056) || // "ARPV"
+        !stream.writeInt32(variationBasePreviewValid_ ? 1 : 0)) {
+        return kResultFalse;
+    }
+
+    for (const auto& step : variationBasePreviewSteps_) {
+        if (!stream.writeInt32(step.enabled ? 1 : 0) ||
+            !stream.writeInt32(step.locked ? 1 : 0) ||
+            !stream.writeInt32(static_cast<int32>(step.noteOffset)) ||
+            !stream.writeDouble(step.velocity) ||
+            !stream.writeDouble(step.gate) ||
+            !stream.writeInt32(static_cast<int32>(step.ratchet)) ||
+            !stream.writeDouble(step.probability) ||
+            !stream.writeInt32(static_cast<int32>(step.octaveOffset))) {
+            return kResultFalse;
+        }
+    }
+    return kResultOk;
 }
 
 IPlugView* PLUGIN_API Controller::createView(FIDString name) {
