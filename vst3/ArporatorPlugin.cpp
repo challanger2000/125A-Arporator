@@ -1338,29 +1338,35 @@ void Controller::editParameter(ParamID id, double normalized) {
         variationBasePreviewValid_ = true;
     }
 
-    // Restore the visible step parameters immediately. The reset trigger below
-    // still performs the authoritative processor-side restore; this preview
-    // removes stale R/P badges after a save/reload while playback is stopped.
+    // RESET must be authoritative at host level as well. Merely calling
+    // setParamNormalized() changes the controller cache but does not tell the
+    // host that automation/state values changed, so a host can immediately
+    // restore the stale varied values. Push every restored step parameter
+    // through the full VST3 edit gesture.
     if (id == kVariateResetId && variationBasePreviewValid_) {
+        const auto push = [&](ParamID pid, double value) {
+            value = std::clamp(value, 0.0, 1.0);
+            setParamNormalized(pid, value);
+            beginEdit(pid);
+            performEdit(pid, value);
+            endEdit(pid);
+        };
+
         for (int i = 0; i < kStepParamCount; ++i) {
             const auto& step =
                 variationBasePreviewSteps_[static_cast<std::size_t>(i)];
-            setParamNormalized(kStepEnableBase + i, step.enabled ? 1.0 : 0.0);
-            setParamNormalized(kStepVelocityBase + i, step.velocity);
-            setParamNormalized(
-                kStepGateBase + i,
-                (static_cast<double>(step.gate) - 0.01) / 0.99);
-            setParamNormalized(
-                kStepRatchetBase + i,
-                static_cast<double>(step.ratchet - 1) / 3.0);
-            setParamNormalized(kStepProbabilityBase + i, step.probability);
-            setParamNormalized(
-                kStepNoteBase + i,
-                static_cast<double>(step.noteOffset + 4) / 8.0);
-            setParamNormalized(
-                kStepOctaveBase + i,
-                static_cast<double>(step.octaveOffset + 2) / 4.0);
-            setParamNormalized(kStepLockBase + i, step.locked ? 1.0 : 0.0);
+            push(kStepEnableBase + i, step.enabled ? 1.0 : 0.0);
+            push(kStepVelocityBase + i, step.velocity);
+            push(kStepGateBase + i,
+                 (static_cast<double>(step.gate) - 0.01) / 0.99);
+            push(kStepRatchetBase + i,
+                 static_cast<double>(step.ratchet - 1) / 3.0);
+            push(kStepProbabilityBase + i, step.probability);
+            push(kStepNoteBase + i,
+                 static_cast<double>(step.noteOffset + 4) / 8.0);
+            push(kStepOctaveBase + i,
+                 static_cast<double>(step.octaveOffset + 2) / 4.0);
+            push(kStepLockBase + i, step.locked ? 1.0 : 0.0);
         }
         variationBasePreviewValid_ = false;
     }
