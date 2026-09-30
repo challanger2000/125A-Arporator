@@ -105,14 +105,12 @@ void FaceplateView::draw(VSTGUI::CDrawContext* c) {
     box(10,10,1160,660);
     box(22,20,1136,54);
     box(22,88,1136,116);
-    box(22,216,1136,248,true);
-    box(22,476,770,174);
-    box(804,476,354,174);
+    box(22,216,1136,354,true);
 
     c->setFrameColor({86,154,220,70});
     c->setLineWidth(1.0);
     c->drawLine({r.left+34,r.top+210},{r.left+1146,r.top+210});
-    c->drawLine({r.left+34,r.top+470},{r.left+1146,r.top+470});
+    c->drawLine({r.left+34,r.top+450},{r.left+1146,r.top+450});
 
     setDirty(false);
 }
