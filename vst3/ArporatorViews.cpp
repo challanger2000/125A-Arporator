@@ -462,7 +462,9 @@ void StepGridView::showStepMenu(int step, const VSTGUI::CPoint& where) {
 
     controller_->setSelectedStep(step);
 
-    menu->popup(getFrame(),where,[this,step](VSTGUI::COptionMenu* selectedMenu){
+    auto popupPoint = where;
+    localToFrame(popupPoint);
+    menu->popup(getFrame(),popupPoint,[this,step](VSTGUI::COptionMenu* selectedMenu){
         if (!controller_ || !selectedMenu)
             return;
 
