@@ -9,6 +9,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(ArporatorCore STATIC
     source/arporator_engine.cpp
     source/arporator_engine.h
+    source/variation.cpp
+    source/variation.h
 )
 
 target_include_directories(ArporatorCore PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/source")
@@ -17,8 +19,12 @@ target_compile_features(ArporatorCore PUBLIC cxx_std_17)
 add_executable(ArporatorEngineTests tests/arporator_engine_tests.cpp)
 target_link_libraries(ArporatorEngineTests PRIVATE ArporatorCore)
 
+add_executable(ArporatorVariationTests tests/variation_tests.cpp)
+target_link_libraries(ArporatorVariationTests PRIVATE ArporatorCore)
+
 enable_testing()
 add_test(NAME ArporatorEngineTests COMMAND ArporatorEngineTests)
+add_test(NAME ArporatorVariationTests COMMAND ArporatorVariationTests)
 
 
 option(ARPORATOR_BUILD_VST3 "Build the VST3 plugin target" OFF)
