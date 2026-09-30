@@ -409,7 +409,8 @@ void Engine::stopAll(double when,
 }
 
 void Engine::emitStep(double stepSample,
-                      double stepDuration) noexcept {
+                      double stepDuration,
+                      double sampleRate) noexcept {
     const int stepIndex = clampInt(currentStep_, 0, settings_.patternLength - 1);
     lastEmittedStep_ = stepIndex;
     const auto& baseStep = settings_.steps[static_cast<std::size_t>(stepIndex)];
@@ -604,19 +605,9 @@ void Engine::emitStep(double stepSample,
         static_cast<double>(downbeatTightness) *
         static_cast<double>(humanTimingUnit);
 
-    const double strumRank =
-        chordCount > 1
-            ? static_cast<double>(chordRank) /
-              static_cast<double>(chordCount - 1)
-            : 0.0;
-    const double strumDelaySamples =
-        stepDuration * 0.20 *
-        static_cast<double>(settings_.strum) *
-        strumRank;
-
     const double feelDelay = std::min(
         stepDuration * 0.45,
-        grooveDelaySamples + humanDelaySamples + strumDelaySamples);
+        grooveDelaySamples + humanDelaySamples);
     const double feltStepSample = stepSample + feelDelay;
 
     const float humanVelocity =
@@ -641,43 +632,95 @@ void Engine::emitStep(double stepSample,
                  subDuration * static_cast<double>(step.gate) *
                  static_cast<double>(settings_.globalGate));
 
+    // Build a compact guitar-like chord inversion around the selected arp
+    // pitch. The selected arp pitch remains the first/lowest voice so the
+    // arpeggio direction still drives harmonic motion. Extra voices are drawn
+    // from the held chord and constrained through the active pitch policy.
+    std::array<int, 4> strumPitches {};
+    int strumVoiceCount = 1;
+    strumPitches[0] = pitch;
+
+    if (settings_.strum > 0.0f && chordCount > 1) {
+        for (int chordIndex = 0;
+             chordIndex < chordCount && strumVoiceCount < 4;
+             ++chordIndex) {
+            const int heldPitch = chord[static_cast<std::size_t>(chordIndex)];
+            const int pcOffset = positiveMod(heldPitch - pitch, 12);
+            int candidate = clampInt(pitch + pcOffset, 0, 127);
+            candidate = constrainPitch(candidate, chord, chordCount);
+
+            bool duplicate = false;
+            for (int voice = 0; voice < strumVoiceCount; ++voice) {
+                if (strumPitches[static_cast<std::size_t>(voice)] == candidate) {
+                    duplicate = true;
+                    break;
+                }
+            }
+            if (!duplicate)
+                strumPitches[static_cast<std::size_t>(strumVoiceCount++)] =
+                    candidate;
+        }
+    }
+
+    // A short physical strum is time-based, not tempo-based. At 100% the full
+    // stroke spans 25 ms; at lower values it becomes both tighter and quieter.
+    const double totalStrumSamples =
+        sampleRate * 0.025 * static_cast<double>(settings_.strum);
+
     for (int hit = 0; hit < ratchet; ++hit) {
-        // Reserve NoteOn + matching NoteOff as an atomic pair. If the bounded
-        // scheduler is unexpectedly full, skip this hit rather than risk a
-        // NoteOn that can never receive its NoteOff.
-        if (freeScheduledSlots() < 2)
-            break;
-
-        const double onSample =
+        const double hitSample =
             feltStepSample + subDuration * static_cast<double>(hit);
-        const double offSample = onSample + gateDuration;
-        const int noteId = nextNoteId_++;
 
-        const MidiOutput on {
-            MidiInput::Type::NoteOn,
-            0,
-            channel,
-            pitch,
-            finalVelocity,
-            noteId
-        };
-        const MidiOutput off {
-            MidiInput::Type::NoteOff,
-            0,
-            channel,
-            pitch,
-            0.0f,
-            noteId
-        };
+        for (int voice = 0; voice < strumVoiceCount; ++voice) {
+            if (freeScheduledSlots() < 2)
+                return;
 
-        if (!scheduleOutput(onSample, on))
-            break;
-        if (!scheduleOutput(offSample, off)) {
-            // Should be unreachable after the two-slot check; fail safely by
-            // cancelling all future scheduled traffic rather than leaving an
-            // unmatched NoteOn.
-            cancelScheduled();
-            break;
+            const double voicePosition =
+                strumVoiceCount > 1
+                    ? static_cast<double>(voice) /
+                      static_cast<double>(strumVoiceCount - 1)
+                    : 0.0;
+            const double onSample =
+                hitSample + totalStrumSamples * voicePosition;
+            const double offSample = onSample + gateDuration;
+            const int noteId = nextNoteId_++;
+
+            float voiceVelocity = finalVelocity;
+            if (voice > 0) {
+                const float rankAccent =
+                    std::max(0.72f, 0.94f - 0.05f * static_cast<float>(voice - 1));
+                voiceVelocity = clamp01(
+                    finalVelocity *
+                    settings_.strum *
+                    rankAccent);
+            }
+
+            const int voicePitch =
+                strumPitches[static_cast<std::size_t>(voice)];
+
+            const MidiOutput on {
+                MidiInput::Type::NoteOn,
+                0,
+                channel,
+                voicePitch,
+                voiceVelocity,
+                noteId
+            };
+            const MidiOutput off {
+                MidiInput::Type::NoteOff,
+                0,
+                channel,
+                voicePitch,
+                0.0f,
+                noteId
+            };
+
+            if (!scheduleOutput(onSample, on))
+                return;
+            if (!scheduleOutput(offSample, off)) {
+                cancelScheduled();
+                return;
+            }
         }
     }
 }
@@ -755,7 +798,7 @@ void Engine::process(double sampleRate,
                         output.capacity();
 
                 if (hasRealtimeRoom)
-                    emitStep(scheduled, stepDuration);
+                    emitStep(scheduled, stepDuration, sampleRate);
             }
 
             const int previousStep = currentStep_;
