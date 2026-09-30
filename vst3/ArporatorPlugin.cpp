@@ -1189,6 +1189,13 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* state) {
     setNorm(kVariateResetId, 0.0);
     setNorm(kPlayheadId, 0.0);
 
+    // Preserve the captured pre-Variate pattern in the controller as well.
+    // RESET must update the visible grid immediately after project recall,
+    // even when the audio processor is currently idle and cannot mirror
+    // output parameter changes back to the host yet.
+    variationBasePreviewValid_ = runtime.variationBaseValid;
+    variationBasePreviewSteps_ = runtime.variationBaseSteps;
+
     for (int i = 0; i < kStepParamCount; ++i) {
         const auto& step =
             runtime.settings.steps[static_cast<std::size_t>(i)];
@@ -1306,6 +1313,58 @@ void Controller::setSelectedStep(int step) noexcept {
 
 void Controller::editParameter(ParamID id, double normalized) {
     normalized = std::clamp(normalized, 0.0, 1.0);
+
+    // Capture the visible stored pattern before the first Variate in a
+    // variation session. This mirrors the processor's variation base and
+    // gives RESET a synchronous GUI source even while transport is stopped.
+    if (id == kVariateTriggerId && !variationBasePreviewValid_) {
+        for (int i = 0; i < kStepParamCount; ++i) {
+            auto& step = variationBasePreviewSteps_[static_cast<std::size_t>(i)];
+            step.enabled = getParamNormalized(kStepEnableBase + i) >= 0.5;
+            step.velocity = static_cast<float>(
+                getParamNormalized(kStepVelocityBase + i));
+            step.gate = static_cast<float>(
+                0.01 + getParamNormalized(kStepGateBase + i) * 0.99);
+            step.ratchet = static_cast<std::uint8_t>(
+                1 + normIndex(getParamNormalized(kStepRatchetBase + i), 3));
+            step.probability = static_cast<float>(
+                getParamNormalized(kStepProbabilityBase + i));
+            step.noteOffset = static_cast<std::int8_t>(
+                normIndex(getParamNormalized(kStepNoteBase + i), 8) - 4);
+            step.octaveOffset = static_cast<std::int8_t>(
+                normIndex(getParamNormalized(kStepOctaveBase + i), 4) - 2);
+            step.locked = getParamNormalized(kStepLockBase + i) >= 0.5;
+        }
+        variationBasePreviewValid_ = true;
+    }
+
+    // Restore the visible step parameters immediately. The reset trigger below
+    // still performs the authoritative processor-side restore; this preview
+    // removes stale R/P badges after a save/reload while playback is stopped.
+    if (id == kVariateResetId && variationBasePreviewValid_) {
+        for (int i = 0; i < kStepParamCount; ++i) {
+            const auto& step =
+                variationBasePreviewSteps_[static_cast<std::size_t>(i)];
+            setParamNormalized(kStepEnableBase + i, step.enabled ? 1.0 : 0.0);
+            setParamNormalized(kStepVelocityBase + i, step.velocity);
+            setParamNormalized(
+                kStepGateBase + i,
+                (static_cast<double>(step.gate) - 0.01) / 0.99);
+            setParamNormalized(
+                kStepRatchetBase + i,
+                static_cast<double>(step.ratchet - 1) / 3.0);
+            setParamNormalized(kStepProbabilityBase + i, step.probability);
+            setParamNormalized(
+                kStepNoteBase + i,
+                static_cast<double>(step.noteOffset + 4) / 8.0);
+            setParamNormalized(
+                kStepOctaveBase + i,
+                static_cast<double>(step.octaveOffset + 2) / 4.0);
+            setParamNormalized(kStepLockBase + i, step.locked ? 1.0 : 0.0);
+        }
+        variationBasePreviewValid_ = false;
+    }
+
     setParamNormalized(id, normalized);
     beginEdit(id);
     performEdit(id, normalized);
