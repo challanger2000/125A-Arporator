@@ -542,6 +542,110 @@ int main() {
     CHECK(selectedNotes[1] == 67);
     CHECK(selectedNotes[2] == 60);
 
+    // Rendering must be block-size independent: identical musical settings
+    // and input events yield identical absolute NoteOn positions.
+    auto renderWithBlock = [](int blockSize) {
+        Engine e;
+        Settings s;
+        s.patternLength = 7;
+        s.stepsPerQuarter = 4.0;
+        s.mode = Mode::UpDown;
+        s.restartOnTrigger = true;
+        s.swing = 0.30f;
+        s.humanize = 0.40f;
+        s.groove = 0.50f;
+        s.strum = 0.20f;
+        s.randomSeed = 0x125A5566u;
+        for (auto& step : s.steps) {
+            step.enabled = true;
+            step.velocity = 0.8f;
+            step.gate = 0.7f;
+            step.ratchet = 1;
+            step.probability = 1.0f;
+        }
+        e.setSettings(s);
+        e.reset();
+
+        std::vector<long long> absoluteOns;
+        std::vector<MidiOutput> localOut;
+        int cursor = 0;
+        const int total = 60000;
+        bool first = true;
+        while (cursor < total) {
+            const int n = std::min(blockSize, total - cursor);
+            std::vector<MidiInput> in;
+            if (first) {
+                in = {
+                    {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                    {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f},
+                    {MidiInput::Type::NoteOn, 0, 0, 67, 1.0f}
+                };
+                first = false;
+            }
+            e.process(48000.0, 120.0, n, in, localOut);
+            for (const auto& ev : localOut) {
+                if (ev.type == MidiInput::Type::NoteOn)
+                    absoluteOns.push_back(
+                        static_cast<long long>(cursor + ev.sampleOffset));
+            }
+            cursor += n;
+        }
+        return absoluteOns;
+    };
+
+    const auto block64 = renderWithBlock(64);
+    const auto block257 = renderWithBlock(257);
+    const auto block1024 = renderWithBlock(1024);
+    CHECK(block64 == block257);
+    CHECK(block64 == block1024);
+    CHECK(!block64.empty());
+
+    // Fractional sample grids at 44.1 kHz remain sample-accurate.
+    settings = Settings{};
+    settings.patternLength = 4;
+    settings.stepsPerQuarter = 4.0;
+    settings.mode = Mode::Up;
+    for (auto& s : settings.steps) {
+        s.enabled = true;
+        s.velocity = 1.0f;
+        s.gate = 1.0f;
+        s.ratchet = 1;
+        s.probability = 1.0f;
+    }
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(44100.0, 120.0, 18000,
+                   {{MidiInput::Type::NoteOn, 0, 0, 60, 1.0f}},
+                   out);
+    std::vector<int> rate441;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn)
+            rate441.push_back(e.sampleOffset);
+    }
+    CHECK(rate441.size() >= 4);
+    CHECK(rate441[0] == 0);
+    CHECK(rate441[1] == 5512);
+    CHECK(rate441[2] == 11025);
+    CHECK(rate441[3] == 16537);
+
+    // Tempo change preserves fractional phase of the pending step. Starting at
+    // 120 BPM, halfway to the next 1/16 step, switching to 240 BPM should leave
+    // half of the new 3000-sample step = 1500 samples remaining.
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 3000,
+                   {{MidiInput::Type::NoteOn, 0, 0, 60, 1.0f}},
+                   out);
+    engine.process(48000.0, 240.0, 2000, {}, out);
+    bool tempoAdjusted = false;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn &&
+            e.sampleOffset == 1500) {
+            tempoAdjusted = true;
+        }
+    }
+    CHECK(tempoAdjusted);
+
     std::cout << "ArporatorEngineTests PASS\n";
     return EXIT_SUCCESS;
 }
