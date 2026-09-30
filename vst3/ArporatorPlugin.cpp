@@ -78,6 +78,7 @@ bool writeRuntimeState(IBStream* state, const RuntimeState& runtime) noexcept {
         !s.writeDouble(runtime.settings.humanize) ||
         !s.writeDouble(runtime.settings.groove) ||
         !s.writeDouble(runtime.settings.strum) ||
+        !s.writeDouble(runtime.settings.evolve) ||
         !s.writeDouble(runtime.variationAmount) ||
         !s.writeInt32(runtime.variationLocks.rhythm ? 1 : 0) ||
         !s.writeInt32(runtime.variationLocks.velocity ? 1 : 0) ||
@@ -129,6 +130,7 @@ bool readRuntimeState(IBStream* state, RuntimeState& runtime) noexcept {
     double humanize = 0.0;
     double groove = 0.0;
     double strum = 0.0;
+    double evolve = 0.0;
     double variationAmount = 0.35;
     int32 lockRhythm = 0;
     int32 lockVelocity = 0;
@@ -155,6 +157,11 @@ bool readRuntimeState(IBStream* state, RuntimeState& runtime) noexcept {
             !s.readDouble(strum)) {
             return false;
         }
+    }
+
+    if (version >= 4) {
+        if (!s.readDouble(evolve))
+            return false;
     }
 
     if (version >= 3) {
@@ -195,6 +202,8 @@ bool readRuntimeState(IBStream* state, RuntimeState& runtime) noexcept {
         static_cast<float>(std::clamp(groove, 0.0, 1.0));
     clean.settings.strum =
         static_cast<float>(std::clamp(strum, 0.0, 1.0));
+    clean.settings.evolve =
+        static_cast<float>(std::clamp(evolve, 0.0, 1.0));
     clean.variationAmount =
         static_cast<float>(std::clamp(variationAmount, 0.0, 1.0));
     clean.variationLocks.rhythm = lockRhythm != 0;
@@ -348,6 +357,7 @@ void Processor::applyRuntimeState(const RuntimeState& state) noexcept {
         stepsPerQuarterForRate(state_.rateIndex);
     state_.settings.scaleMask =
         scaleMaskForMode(state_.scaleMode);
+    state_.settings.evolveLocks = state_.variationLocks;
     engine_.setSettings(state_.settings);
     variateTrigger_ = 0.0;
     settingsDirty_ = false;
@@ -414,20 +424,28 @@ void Processor::applyNormalizedParameter(ParamID id, double value) noexcept {
         state_.settings.groove = static_cast<float>(value);
     } else if (id == kStrumId) {
         state_.settings.strum = static_cast<float>(value);
+    } else if (id == kEvolveId) {
+        state_.settings.evolve = static_cast<float>(value);
     } else if (id == kVariationAmountId) {
         state_.variationAmount = static_cast<float>(value);
     } else if (id == kLockRhythmId) {
         state_.variationLocks.rhythm = value >= 0.5;
+        state_.settings.evolveLocks.rhythm = state_.variationLocks.rhythm;
     } else if (id == kLockVelocityId) {
         state_.variationLocks.velocity = value >= 0.5;
+        state_.settings.evolveLocks.velocity = state_.variationLocks.velocity;
     } else if (id == kLockGateId) {
         state_.variationLocks.gate = value >= 0.5;
+        state_.settings.evolveLocks.gate = state_.variationLocks.gate;
     } else if (id == kLockRatchetId) {
         state_.variationLocks.ratchet = value >= 0.5;
+        state_.settings.evolveLocks.ratchet = state_.variationLocks.ratchet;
     } else if (id == kLockProbabilityId) {
         state_.variationLocks.probability = value >= 0.5;
+        state_.settings.evolveLocks.probability = state_.variationLocks.probability;
     } else if (id == kLockOctaveId) {
         state_.variationLocks.octave = value >= 0.5;
+        state_.settings.evolveLocks.octave = state_.variationLocks.octave;
     } else if (id == kVariateTriggerId) {
         const double previous = variateTrigger_;
         variateTrigger_ = value;
@@ -781,6 +799,10 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
         0.0, 100.0, 0.0, 0));
 
     parameters.addParameter(new RangeParameter(
+        STR16("Evolve"), kEvolveId, STR16("%"),
+        0.0, 100.0, 0.0, 0));
+
+    parameters.addParameter(new RangeParameter(
         STR16("Variation Amount"), kVariationAmountId, STR16("%"),
         0.0, 100.0, 35.0, 0));
 
@@ -890,6 +912,7 @@ tresult PLUGIN_API Controller::setComponentState(IBStream* state) {
     setNorm(kHumanizeId, runtime.settings.humanize);
     setNorm(kGrooveId, runtime.settings.groove);
     setNorm(kStrumId, runtime.settings.strum);
+    setNorm(kEvolveId, runtime.settings.evolve);
     setNorm(kVariationAmountId, runtime.variationAmount);
     setNorm(kLockRhythmId, runtime.variationLocks.rhythm ? 1.0 : 0.0);
     setNorm(kLockVelocityId, runtime.variationLocks.velocity ? 1.0 : 0.0);
