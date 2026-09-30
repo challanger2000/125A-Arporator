@@ -646,6 +646,38 @@ int main() {
     }
     CHECK(tempoAdjusted);
 
+    // SCALE policy honors the supplied pitch-class mask. C major excludes F#,
+    // while C Lydian includes it.
+    settings = Settings{};
+    settings.patternLength = 1;
+    settings.stepsPerQuarter = 4.0;
+    settings.mode = Mode::Up;
+    settings.scalePolicy = ScalePolicy::Scale;
+    settings.keyRoot = 0;
+    settings.scaleMask = 0x0AB5u; // C major
+    settings.steps[0].enabled = true;
+    settings.steps[0].velocity = 1.0f;
+    settings.steps[0].gate = 1.0f;
+    settings.steps[0].probability = 1.0f;
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 1000,
+                   {{MidiInput::Type::NoteOn, 0, 0, 66, 1.0f}},
+                   out);
+    auto majorConstrained = noteOns(out);
+    CHECK(!majorConstrained.empty());
+    CHECK(majorConstrained[0] == 65);
+
+    settings.scaleMask = 0x0AD5u; // C Lydian includes F#
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 1000,
+                   {{MidiInput::Type::NoteOn, 0, 0, 66, 1.0f}},
+                   out);
+    auto lydianConstrained = noteOns(out);
+    CHECK(!lydianConstrained.empty());
+    CHECK(lydianConstrained[0] == 66);
+
     std::cout << "ArporatorEngineTests PASS\n";
     return EXIT_SUCCESS;
 }
