@@ -7,6 +7,9 @@
 namespace arporator {
 namespace {
 
+constexpr std::size_t kOutputSafetyHeadroom = 256u;
+
+
 int clampInt(int v, int lo, int hi) noexcept {
     return v < lo ? lo : (v > hi ? hi : v);
 }
@@ -733,8 +736,27 @@ void Engine::process(double sampleRate,
                 numSamples,
                 output);
 
-            if (scheduled >= blockStart)
-                emitStep(scheduled, stepDuration);
+            if (scheduled >= blockStart) {
+                // Advance the visual/sequencer position even when output
+                // backpressure suppresses fresh note traffic.
+                lastEmittedStep_ =
+                    clampInt(currentStep_, 0, settings_.patternLength - 1);
+
+                // In the plugin path output is pre-reserved. Keep enough fixed
+                // headroom for every already-scheduled event (128) plus every
+                // active-note safety NoteOff (64), with margin. Once the block
+                // reaches this high-water mark, stop creating new note pairs
+                // rather than allowing std::vector to grow on the audio thread.
+                const bool boundedOutput =
+                    output.capacity() >= kOutputSafetyHeadroom * 2u;
+                const bool hasRealtimeRoom =
+                    !boundedOutput ||
+                    output.size() + kOutputSafetyHeadroom <
+                        output.capacity();
+
+                if (hasRealtimeRoom)
+                    emitStep(scheduled, stepDuration);
+            }
 
             const int previousStep = currentStep_;
             currentStep_ = (currentStep_ + 1) % settings_.patternLength;
