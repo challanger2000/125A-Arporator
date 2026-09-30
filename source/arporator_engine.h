@@ -122,6 +122,7 @@ private:
 
     double absoluteSample_ {0.0};
     double nextStepSample_ {0.0};
+    double lastStepDuration_ {0.0};
     int currentStep_ {0};
     int directionIndex_ {0};
     int directionSign_ {1};
