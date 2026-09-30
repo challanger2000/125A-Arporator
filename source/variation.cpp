@@ -55,6 +55,8 @@ Settings variateSettings(const Settings& source,
         const float probabilityDelta = bipolar(rng);
         const float octaveRoll = unit(rng);
         const float octaveDirection = bipolar(rng);
+        const float noteRoll = unit(rng);
+        const float noteDirection = bipolar(rng);
 
         if (original.locked)
             continue;
@@ -103,6 +105,15 @@ Settings variateSettings(const Settings& source,
                 -2,
                 2));
         }
+
+        if (!request.locks.note &&
+            noteRoll < 0.35f * amount) {
+            const int direction = noteDirection >= 0.0f ? 1 : -1;
+            step.noteOffset = static_cast<std::int8_t>(std::clamp(
+                static_cast<int>(original.noteOffset) + direction,
+                -4,
+                4));
+        }
     }
 
     // Never return a silent active pattern purely because Variate toggled every
@@ -135,6 +146,8 @@ Settings variateSettings(const Settings& source,
     result.humanize = source.humanize;
     result.groove = source.groove;
     result.strum = source.strum;
+    result.evolve = source.evolve;
+    result.evolveLocks = source.evolveLocks;
     result.globalGate = source.globalGate;
     result.randomSeed = source.randomSeed;
 
