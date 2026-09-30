@@ -31,6 +31,7 @@ struct VariationLocks {
     bool ratchet {false};
     bool probability {false};
     bool octave {false};
+    bool note {false};
 };
 
 struct Step {
@@ -40,6 +41,7 @@ struct Step {
     float gate {1.0f};          // 0.01..1 per-step multiplier
     std::uint8_t ratchet {1};   // 1..4
     float probability {1.0f};   // 0..1
+    std::int8_t noteOffset {0};  // -4..+4 index offset in arp note order
     std::int8_t octaveOffset {0};
 };
 
