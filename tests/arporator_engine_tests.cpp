@@ -111,6 +111,24 @@ int main() {
         sawOff = sawOff || e.type == MidiInput::Type::NoteOff;
     CHECK(sawOff);
 
+    // Events inside one host block must be processed in chronological order:
+    // a NoteOff later in the block may not erase a step that was due earlier.
+    settings.patternLength = 1;
+    settings.steps[0].ratchet = 1;
+    settings.steps[0].probability = 1.0f;
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 7000,
+                   {
+                       {MidiInput::Type::NoteOn, 100, 0, 60, 1.0f},
+                       {MidiInput::Type::NoteOff, 6200, 0, 60, 0.0f}
+                   },
+                   out);
+    auto chronological = noteOns(out);
+    CHECK(!chronological.empty());
+    CHECK(out.front().sampleOffset == 100);
+    CHECK(!engine.running());
+
     std::cout << "ArporatorEngineTests PASS\n";
     return EXIT_SUCCESS;
 }
