@@ -3,6 +3,7 @@ name: Arporator Core CI
 on:
   push:
     branches:
+      - v0.1.0-development
       - v1.0.0-release
     paths:
       - "CMakeLists.txt"
