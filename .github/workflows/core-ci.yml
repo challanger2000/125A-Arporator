@@ -11,6 +11,10 @@ on:
       - ".github/workflows/core-ci.yml"
   workflow_dispatch:
 
+concurrency:
+  group: arporator-core-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   core:
     runs-on: windows-latest
