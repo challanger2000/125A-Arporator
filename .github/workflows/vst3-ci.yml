@@ -8,6 +8,7 @@ on:
       - "CMakeLists.txt"
       - "vst3/**"
       - "resource/**"
+      - "tools/**"
       - "source/arporator_engine.cpp"
       - "source/arporator_engine.h"
       - ".github/workflows/vst3-ci.yml"
