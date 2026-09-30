@@ -414,29 +414,55 @@ int main() {
     CHECK(grooveOffsets[0] == 0);
     CHECK(grooveOffsets[1] == 6720);
 
-    // Strum spreads later chord ranks without moving the root/first rank.
+    // STRUM is a true short held-chord burst, not another groove delay.
+    // At 48 kHz and 100%, a three-note C-E-G stroke spans 25 ms:
+    // 0 / 12.5 / 25 ms = 0 / 600 / 1200 samples within one arp step.
     settings.groove = 0.0f;
     settings.strum = 1.0f;
     engine.setSettings(settings);
     engine.reset();
-    engine.process(48000.0, 120.0, 14000,
+    engine.process(48000.0, 120.0, 2000,
                    {
                        {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
                        {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f},
                        {MidiInput::Type::NoteOn, 0, 0, 67, 1.0f}
                    },
                    out);
-    std::vector<int> strumOffsets;
+    std::vector<MidiOutput> strumOns;
     for (const auto& e : out) {
         if (e.type == MidiInput::Type::NoteOn)
-            strumOffsets.push_back(e.sampleOffset);
+            strumOns.push_back(e);
     }
-    CHECK(strumOffsets.size() >= 3);
-    CHECK(strumOffsets[0] == 0);
-    CHECK(strumOffsets[1] == 6600);
-    CHECK(strumOffsets[2] == 13200);
+    CHECK(strumOns.size() == 3);
+    CHECK(strumOns[0].sampleOffset == 0);
+    CHECK(strumOns[1].sampleOffset == 600);
+    CHECK(strumOns[2].sampleOffset == 1200);
+    CHECK(strumOns[0].pitch == 60);
+    CHECK(strumOns[1].pitch == 64);
+    CHECK(strumOns[2].pitch == 67);
+    CHECK(strumOns[0].velocity == 1.0f);
+    CHECK(strumOns[1].velocity < strumOns[0].velocity);
+    CHECK(strumOns[2].velocity <= strumOns[1].velocity);
 
-    // EVOLVE is non-destructive and deliberately slow: the first four full
+    // At 0%, STRUM must collapse back to exactly one normal arp note.
+    settings.strum = 0.0f;
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 2000,
+                   {
+                       {MidiInput::Type::NoteOn, 0, 0, 60, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 64, 1.0f},
+                       {MidiInput::Type::NoteOn, 0, 0, 67, 1.0f}
+                   },
+                   out);
+    int neutralStrumOns = 0;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn)
+            ++neutralStrumOns;
+    }
+    CHECK(neutralStrumOns == 1);
+
+    // EVOLVE is non-destructive and deliberately slow: the first two full
     // pattern cycles are identical to the stored pattern, then a deterministic
     // phase may alter only unlocked performance properties.
     settings = Settings{};
