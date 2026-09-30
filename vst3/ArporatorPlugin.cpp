@@ -1466,7 +1466,7 @@ DEF_CLASS2(
     "125A Arporator",
     Vst::kDistributable,
     Vst::PlugType::kInstrumentSynth,
-    "0.1.0",
+    "1.0.0",
     kVstVersionString,
     arporator::vst3::Processor::createInstance)
 
@@ -1477,7 +1477,7 @@ DEF_CLASS2(
     "125A Arporator Controller",
     0,
     "",
-    "0.1.0",
+    "1.0.0",
     kVstVersionString,
     arporator::vst3::Controller::createInstance)
 
