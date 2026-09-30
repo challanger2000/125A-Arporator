@@ -668,6 +668,7 @@ void Engine::process(double sampleRate,
             currentStep_ = 0;
             directionIndex_ = 0;
             directionSign_ = 1;
+            patternCycle_ = 0u;
             nextStepSample_ = eventSample;
             emitUntil(std::min(blockEnd, eventSample + 1.0));
         } else if (!running_ && anyHeld()) {
