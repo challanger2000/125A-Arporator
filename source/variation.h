@@ -6,15 +6,6 @@
 
 namespace arporator {
 
-struct VariationLocks {
-    bool rhythm {false};
-    bool velocity {false};
-    bool gate {false};
-    bool ratchet {false};
-    bool probability {false};
-    bool octave {false};
-};
-
 struct VariationRequest {
     float amount {0.35f}; // 0..1
     std::uint32_t seed {0x125A7001u};
