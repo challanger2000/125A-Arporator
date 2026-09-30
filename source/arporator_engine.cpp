@@ -90,6 +90,8 @@ void Engine::reset() noexcept {
     clearHeld();
     for (auto& out : activeOutputs_)
         out = {};
+    for (auto& pending : scheduledOutputs_)
+        pending = {};
     absoluteSample_ = 0.0;
     nextStepSample_ = 0.0;
     lastStepDuration_ = 0.0;
@@ -277,10 +279,112 @@ int Engine::constrainPitch(
     return best;
 }
 
+void Engine::cancelScheduled() noexcept {
+    for (auto& pending : scheduledOutputs_)
+        pending = {};
+}
+
+int Engine::freeScheduledSlots() const noexcept {
+    int free = 0;
+    for (const auto& pending : scheduledOutputs_) {
+        if (!pending.occupied)
+            ++free;
+    }
+    return free;
+}
+
+bool Engine::scheduleOutput(double absoluteSample,
+                            const MidiOutput& event) noexcept {
+    if (!std::isfinite(absoluteSample))
+        return false;
+
+    for (auto& pending : scheduledOutputs_) {
+        if (pending.occupied)
+            continue;
+        pending.occupied = true;
+        pending.absoluteSample = absoluteSample;
+        pending.event = event;
+        return true;
+    }
+    return false;
+}
+
+void Engine::flushScheduled(double limitSample,
+                            double blockStart,
+                            int blockSize,
+                            std::vector<MidiOutput>& output) noexcept {
+    const auto priority = [](const MidiOutput& event) noexcept {
+        if (event.type == MidiInput::Type::NoteOff)
+            return 0;
+        if (event.type == MidiInput::Type::NoteOn)
+            return 2;
+        return 1;
+    };
+
+    for (;;) {
+        int bestIndex = -1;
+        double bestSample = limitSample;
+        int bestPriority = 99;
+
+        for (std::size_t i = 0; i < scheduledOutputs_.size(); ++i) {
+            const auto& pending = scheduledOutputs_[i];
+            if (!pending.occupied || pending.absoluteSample >= limitSample)
+                continue;
+
+            const int p = priority(pending.event);
+            if (bestIndex < 0 ||
+                pending.absoluteSample < bestSample ||
+                (std::abs(pending.absoluteSample - bestSample) <= 1.0e-9 &&
+                 p < bestPriority)) {
+                bestIndex = static_cast<int>(i);
+                bestSample = pending.absoluteSample;
+                bestPriority = p;
+            }
+        }
+
+        if (bestIndex < 0)
+            break;
+
+        auto pending =
+            scheduledOutputs_[static_cast<std::size_t>(bestIndex)];
+        scheduledOutputs_[static_cast<std::size_t>(bestIndex)] = {};
+
+        MidiOutput event = pending.event;
+        const double when = std::max(pending.absoluteSample, blockStart);
+        event.sampleOffset = clampInt(
+            static_cast<int>(std::floor(when - blockStart + 1.0e-9)),
+            0,
+            std::max(0, blockSize - 1));
+
+        if (event.type == MidiInput::Type::NoteOn) {
+            for (auto& active : activeOutputs_) {
+                if (active.active)
+                    continue;
+                active.active = true;
+                active.channel = event.channel;
+                active.pitch = event.pitch;
+                active.noteId = event.noteId;
+                break;
+            }
+        } else if (event.type == MidiInput::Type::NoteOff) {
+            for (auto& active : activeOutputs_) {
+                if (active.active && active.noteId == event.noteId) {
+                    active = {};
+                    break;
+                }
+            }
+        }
+
+        output.push_back(event);
+    }
+}
+
 void Engine::stopAll(double when,
                      double blockStart,
                      int blockSize,
                      std::vector<MidiOutput>& output) noexcept {
+    cancelScheduled();
+
     const int offset = clampInt(
         static_cast<int>(std::floor(when - blockStart + 1.0e-9)),
         0, std::max(0, blockSize - 1));
@@ -300,36 +404,8 @@ void Engine::stopAll(double when,
     }
 }
 
-void Engine::stopExpired(double blockStart,
-                         double blockEnd,
-                         int blockSize,
-                         std::vector<MidiOutput>& output) noexcept {
-    for (auto& active : activeOutputs_) {
-        if (!active.active || active.offSample >= blockEnd)
-            continue;
-
-        const double when = std::max(active.offSample, blockStart);
-        const int offset = clampInt(
-            static_cast<int>(std::floor(when - blockStart + 1.0e-9)),
-            0, std::max(0, blockSize - 1));
-
-        output.push_back({
-            MidiInput::Type::NoteOff,
-            offset,
-            active.channel,
-            active.pitch,
-            0.0f,
-            active.noteId
-        });
-        active = {};
-    }
-}
-
 void Engine::emitStep(double stepSample,
-                      double stepDuration,
-                      double blockStart,
-                      int blockSize,
-                      std::vector<MidiOutput>& output) noexcept {
+                      double stepDuration) noexcept {
     const int stepIndex = clampInt(currentStep_, 0, settings_.patternLength - 1);
     const auto& baseStep = settings_.steps[static_cast<std::size_t>(stepIndex)];
     Step step = baseStep;
@@ -523,30 +599,41 @@ void Engine::emitStep(double stepSample,
                  static_cast<double>(settings_.globalGate));
 
     for (int hit = 0; hit < ratchet; ++hit) {
+        // Reserve NoteOn + matching NoteOff as an atomic pair. If the bounded
+        // scheduler is unexpectedly full, skip this hit rather than risk a
+        // NoteOn that can never receive its NoteOff.
+        if (freeScheduledSlots() < 2)
+            break;
+
         const double onSample =
             feltStepSample + subDuration * static_cast<double>(hit);
-        const int offset = clampInt(
-            static_cast<int>(std::floor(onSample - blockStart + 1.0e-9)),
-            0, std::max(0, blockSize - 1));
-
+        const double offSample = onSample + gateDuration;
         const int noteId = nextNoteId_++;
-        output.push_back({
+
+        const MidiOutput on {
             MidiInput::Type::NoteOn,
-            offset,
+            0,
             channel,
             pitch,
             finalVelocity,
             noteId
-        });
+        };
+        const MidiOutput off {
+            MidiInput::Type::NoteOff,
+            0,
+            channel,
+            pitch,
+            0.0f,
+            noteId
+        };
 
-        for (auto& active : activeOutputs_) {
-            if (active.active)
-                continue;
-            active.active = true;
-            active.channel = channel;
-            active.pitch = pitch;
-            active.noteId = noteId;
-            active.offSample = onSample + gateDuration;
+        if (!scheduleOutput(onSample, on))
+            break;
+        if (!scheduleOutput(offSample, off)) {
+            // Should be unreachable after the two-slot check; fail safely by
+            // cancelling all future scheduled traffic rather than leaving an
+            // unmatched NoteOn.
+            cancelScheduled();
             break;
         }
     }
@@ -584,7 +671,7 @@ void Engine::process(double sampleRate,
     lastStepDuration_ = stepDuration;
 
     auto emitUntil = [&](double limitSample) {
-        stopExpired(blockStart, limitSample, numSamples, output);
+        flushScheduled(limitSample, blockStart, numSamples, output);
 
         if (!running_ || !anyHeld())
             return;
@@ -600,13 +687,14 @@ void Engine::process(double sampleRate,
             if (scheduled >= limitSample)
                 break;
 
-            stopExpired(blockStart,
-                        std::min(limitSample, scheduled + 1.0),
-                        numSamples,
-                        output);
+            flushScheduled(
+                std::min(limitSample, scheduled + 1.0),
+                blockStart,
+                numSamples,
+                output);
 
             if (scheduled >= blockStart)
-                emitStep(scheduled, stepDuration, blockStart, numSamples, output);
+                emitStep(scheduled, stepDuration);
 
             const int previousStep = currentStep_;
             currentStep_ = (currentStep_ + 1) % settings_.patternLength;
@@ -618,7 +706,7 @@ void Engine::process(double sampleRate,
             nextStepSample_ += stepDuration;
         }
 
-        stopExpired(blockStart, limitSample, numSamples, output);
+        flushScheduled(limitSample, blockStart, numSamples, output);
     };
 
     std::size_t i = 0;
