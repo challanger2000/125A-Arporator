@@ -22,13 +22,15 @@ The V0.1 core is being built measurement-first and GUI-last.
 - deterministic behaviour whenever probability/random features are disabled
 - no stuck notes on Note-Off / All-Notes-Off / reset
 
-Planned musical layer after the deterministic core is verified:
+Implemented musical layer:
 
 - Humanize
 - Strum
 - Groove
-- Variate + Locks
+- Variate + dimension/per-step Locks
 - Evolve
+
+The custom VSTGUI editor provides the 32-step overview, selected-step editing, 100/150% zoom and separate playback playhead.
 
 The goal is not to reproduce BlueARP/Stepic complexity. The target is immediate operation with selected high-value ideas found in modern arpeggiators such as Omnisphere, while remaining substantially more capable than a basic DAW arp.
 
