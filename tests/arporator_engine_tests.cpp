@@ -276,6 +276,40 @@ int main() {
     const auto randomB = noteOns(out);
     CHECK(randomA == randomB);
 
+    // AllNotesOff followed by a fresh NoteOn at the same sample must retrigger,
+    // not leave the new note held while the arp remains stopped.
+    settings = Settings{};
+    settings.patternLength = 4;
+    settings.stepsPerQuarter = 4.0;
+    settings.restartOnTrigger = true;
+    for (auto& s : settings.steps) {
+        s.enabled = true;
+        s.velocity = 1.0f;
+        s.gate = 1.0f;
+        s.ratchet = 1;
+        s.probability = 1.0f;
+    }
+    engine.setSettings(settings);
+    engine.reset();
+    engine.process(48000.0, 120.0, 1000,
+                   {{MidiInput::Type::NoteOn, 0, 0, 60, 1.0f}},
+                   out);
+    engine.process(48000.0, 120.0, 1000,
+                   {
+                       {MidiInput::Type::AllNotesOff, 100, 0, 0, 0.0f},
+                       {MidiInput::Type::NoteOn, 100, 0, 64, 1.0f}
+                   },
+                   out);
+    bool retriggeredAfterStop = false;
+    for (const auto& e : out) {
+        if (e.type == MidiInput::Type::NoteOn &&
+            e.sampleOffset == 100 && e.pitch == 64) {
+            retriggeredAfterStop = true;
+        }
+    }
+    CHECK(retriggeredAfterStop);
+    CHECK(engine.running());
+
     std::cout << "ArporatorEngineTests PASS\n";
     return EXIT_SUCCESS;
 }
