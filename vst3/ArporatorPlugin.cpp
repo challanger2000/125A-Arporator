@@ -836,7 +836,8 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
     rate->appendString(STR16("1/8D"));
     rate->appendString(STR16("1/16D"));
     rate->appendString(STR16("1/32D"));
-    rate->setNormalized(2.0 / 10.0);
+    rate->getInfo().defaultNormalized = 2.0 / 10.0;
+    rate->setNormalized(rate->getInfo().defaultNormalized);
     parameters.addParameter(rate);
 
     auto* octaves = new StringListParameter(STR16("Octaves"), kOctavesId);
@@ -947,9 +948,13 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
 
     for (int i = 0; i < kStepParamCount; ++i) {
         auto enableTitle = makeStepTitle(i, u"On");
-        parameters.addParameter(new RangeParameter(
-            enableTitle.c_str(), kStepEnableBase + i, STR16(""),
-            0.0, 1.0, 1.0, 1));
+        auto* enabled =
+            new StringListParameter(enableTitle.c_str(), kStepEnableBase + i);
+        enabled->appendString(STR16("OFF"));
+        enabled->appendString(STR16("ON"));
+        enabled->getInfo().defaultNormalized = 1.0;
+        enabled->setNormalized(1.0);
+        parameters.addParameter(enabled);
 
         auto velocityTitle = makeStepTitle(i, u"Velocity");
         parameters.addParameter(new RangeParameter(
@@ -987,7 +992,8 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
         note->appendString(STR16("+2"));
         note->appendString(STR16("+3"));
         note->appendString(STR16("+4"));
-        note->setNormalized(0.5);
+        note->getInfo().defaultNormalized = 0.5;
+        note->setNormalized(note->getInfo().defaultNormalized);
         parameters.addParameter(note);
 
         auto octaveTitle = makeStepTitle(i, u"Octave");
@@ -998,7 +1004,8 @@ tresult PLUGIN_API Controller::initialize(FUnknown* context) {
         octave->appendString(STR16("0"));
         octave->appendString(STR16("+1"));
         octave->appendString(STR16("+2"));
-        octave->setNormalized(0.5);
+        octave->getInfo().defaultNormalized = 0.5;
+        octave->setNormalized(octave->getInfo().defaultNormalized);
         parameters.addParameter(octave);
 
         auto lockTitle = makeStepTitle(i, u"Lock");
